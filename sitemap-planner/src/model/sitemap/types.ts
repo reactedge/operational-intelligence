@@ -17,3 +17,15 @@ export interface SitemapPlan {
     count: number;
     entries: PlannedUrl[];
 }
+
+export interface SitemapSelectionConfig {
+    requiredTags: string[];
+    maximumTargetResponseTimeMs: number;
+    minimumPriority: number;
+    limit: number;
+}
+
+export interface SitemapSelection {
+    matched: number;
+    entries: PlannedUrl[];
+}

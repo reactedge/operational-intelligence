@@ -11,6 +11,10 @@ export type Config = {
         allowedHosts: string[];
         timeoutMs: number;
     };
+    cacheWarmer: {
+        url: string;
+        timeoutMs: number;
+    };
     observability: {
         otelHost: string;
         serviceName: string;
@@ -29,6 +33,11 @@ export const config: Config = {
             .map(host => host.trim())
             .filter(Boolean),
         timeoutMs: Number(process.env.SITEMAP_TIMEOUT_MS ?? 10000)
+    },
+    cacheWarmer: {
+        url: process.env.CACHE_WARMER_URL
+            ?? 'http://localhost:8081/cache-warmer/test-urls',
+        timeoutMs: Number(process.env.CACHE_WARMER_TIMEOUT_MS ?? 60000)
     },
     observability: {
         otelHost: process.env.OTEL_HOST ?? 'http://localhost:4318',

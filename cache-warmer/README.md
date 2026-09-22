@@ -55,7 +55,7 @@ Requirements: Node.js 20 or later, npm, and Docker.
 
    To debug instead, open the repository root in VS Code, select **Debug cache warmer**, add a breakpoint in `TestOneUrlHandler.testUrl`, and press F5.
 
-6. From another terminal, submit exactly two URLs:
+6. From another terminal, submit between one and ten URLs:
 
    ```bash
    curl -i --request POST \
@@ -89,8 +89,9 @@ Requirements: Node.js 20 or later, npm, and Docker.
    - parent span `cache_warmer.request`, with the request method, path, and response status;
    - child span `cache_warmer.test_urls` for the sequential operation;
    - `cache_warmer.load_url` for URL 1;
-   - `cache_warmer.platform_status` and `cache_warmer.second_url_gate`;
-   - `cache_warmer.load_url` for URL 2 only when the gate allows it.
+   - `cache_warmer.platform_status` and `cache_warmer.next_url_gate` between
+     URLs;
+   - the next `cache_warmer.load_url` only when the preceding gate allows it.
 
    If the action fails, the child span has status `ERROR` and records the
    exception. The parent span then ends when the HTTP response completes.

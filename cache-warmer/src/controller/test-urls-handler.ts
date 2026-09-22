@@ -10,6 +10,8 @@ import {OpenTelemetryObserver} from "../observability/activity";
 import {Operation} from "../observability/operation";
 
 export class TestUrlsHandler {
+    private static readonly MAX_URLS = 10;
+
     constructor(
         private readonly batchLoader = new BatchLoader(new UrlLoader()),
         private readonly platformSignals = new PlatformSignalsClient(
@@ -43,60 +45,77 @@ export class TestUrlsHandler {
         }
 
         try {
-            const firstResult = await this.warmUrl(
-                urls[0],
-                1,
-                telemetry,
-                operation
-            );
-            const platformStatus = await this.platformSignals.getStatus(
-                telemetry,
-                operation
-            );
-            const decision = this.safetyPolicy.evaluate(
-                firstResult,
-                platformStatus
-            );
-            const gateOperation = telemetry.startChildOperation(
-                operation,
-                'cache_warmer.second_url_gate',
-                {
-                    'cache_warmer.gate.allowed': decision.allowed,
-                    'cache_warmer.gate.reason_count': decision.reasons.length
-                }
-            );
-            gateOperation.addEvent(
-                'cache_warmer.gate.decided',
-                {'cache_warmer.gate.reasons': decision.reasons}
-            );
-            gateOperation.succeed();
+            const results: PerformanceEntry[] = [];
+            const gates: Array<{
+                afterUrl: number;
+                decision: ReturnType<PlatformSafetyPolicy['evaluate']>;
+                platform: Awaited<ReturnType<PlatformSignalsClient['getStatus']>>;
+            }> = [];
 
-            if (!decision.allowed) {
-                operation.setAttribute('cache_warmer.outcome', 'stopped');
-                operation.succeed();
-                res.json({
-                    status: 'stopped',
-                    results: [firstResult],
-                    gate: decision,
+            for (let index = 0; index < urls.length; index += 1) {
+                const result = await this.warmUrl(
+                    urls[index],
+                    index + 1,
+                    telemetry,
+                    operation
+                );
+                results.push(result);
+
+                if (index === urls.length - 1) {
+                    break;
+                }
+
+                const platformStatus = await this.platformSignals.getStatus(
+                    telemetry,
+                    operation
+                );
+                const decision = this.safetyPolicy.evaluate(
+                    result,
+                    platformStatus
+                );
+                const gateOperation = telemetry.startChildOperation(
+                    operation,
+                    'cache_warmer.next_url_gate',
+                    {
+                        'cache_warmer.gate.after_url': index + 1,
+                        'cache_warmer.gate.allowed': decision.allowed,
+                        'cache_warmer.gate.reason_count': decision.reasons.length
+                    }
+                );
+                gateOperation.addEvent(
+                    'cache_warmer.gate.decided',
+                    {'cache_warmer.gate.reasons': decision.reasons}
+                );
+                gateOperation.succeed();
+                gates.push({
+                    afterUrl: index + 1,
+                    decision,
                     platform: platformStatus
                 });
-                return;
-            }
 
-            const secondResult = await this.warmUrl(
-                urls[1],
-                2,
-                telemetry,
-                operation
-            );
+                if (!decision.allowed) {
+                    operation.setAttribute('cache_warmer.outcome', 'stopped');
+                    operation.succeed();
+                    res.json({
+                        status: 'stopped',
+                        results,
+                        gate: decision,
+                        platform: platformStatus,
+                        gates
+                    });
+                    return;
+                }
+            }
 
             operation.setAttribute('cache_warmer.outcome', 'completed');
             operation.succeed();
+            const lastGate = gates.at(-1);
             res.json({
                 status: 'completed',
-                results: [firstResult, secondResult],
-                gate: decision,
-                platform: platformStatus
+                results,
+                gate: lastGate?.decision,
+                platform: lastGate?.platform,
+                gates
             });
         } catch (error) {
             operation.fail(error);
@@ -109,8 +128,14 @@ export class TestUrlsHandler {
     }
 
     private validateUrls(value: unknown): string[] {
-        if (!Array.isArray(value) || value.length !== 2) {
-            throw new Error('Exactly two URLs are required.');
+        if (
+            !Array.isArray(value)
+            || value.length < 1
+            || value.length > TestUrlsHandler.MAX_URLS
+        ) {
+            throw new Error(
+                `Between 1 and ${TestUrlsHandler.MAX_URLS} URLs are required.`
+            );
         }
 
         return value.map(url => {

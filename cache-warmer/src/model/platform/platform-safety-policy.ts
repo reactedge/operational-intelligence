@@ -13,13 +13,13 @@ export class PlatformSafetyPolicy {
     ) {}
 
     evaluate(
-        firstResult: PerformanceEntry,
+        precedingResult: PerformanceEntry,
         status: PlatformSignals
     ): PlatformGateDecision {
         const reasons: string[] = [];
 
-        if (!firstResult.healthy) {
-            reasons.push('The first URL did not return a successful response.');
+        if (!precedingResult.healthy) {
+            reasons.push('The preceding URL did not return a successful response.');
         }
 
         this.rejectAboveThreshold(
