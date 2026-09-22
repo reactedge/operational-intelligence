@@ -1,6 +1,7 @@
 import {NextFunction, Request, RequestHandler, Response} from "express";
 import {sanitiseUrl} from "../lib/url";
 import {OpenTelemetryObserver} from "./activity";
+import {Operation} from "./operation";
 
 export const createRequestOperationMiddleware = (
     operationName: string
@@ -29,6 +30,22 @@ export const createRequestOperationMiddleware = (
                 new Error('Response closed before completion.')
             );
         });
+
+        next();
+    };
+};
+
+export const createRouteOperationMiddleware = (
+    operationName: string
+): RequestHandler => {
+    return (req: Request, res: Response, next: NextFunction): void => {
+        const telemetry = req.app.locals.telemetry as OpenTelemetryObserver;
+        const requestOperation = res.locals.requestOperation as Operation;
+
+        res.locals.routeOperation = telemetry.startChildOperation(
+            requestOperation,
+            operationName
+        );
 
         next();
     };
