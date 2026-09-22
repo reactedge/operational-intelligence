@@ -1,5 +1,7 @@
 import dotenv from 'dotenv';
-dotenv.config();
+// dotenv v17 prints an injection message by default. Keep runtime output in
+// OpenTelemetry by preventing the configuration loader from writing to stdout.
+dotenv.config({quiet: true});
 import appRoot from 'app-root-path';
 
 export type configInfo = {
@@ -8,7 +10,7 @@ export type configInfo = {
     /** Read-only folder for versioned prompts and other operational artefacts. */
     cdnFolder: string,
     route: {
-        validationPrefix: string;
+        cacheWarmerPrefix: string;
     },
     rootDir: string;
     observability: {
@@ -23,7 +25,7 @@ export type configInfo = {
 }
 
 export const config: configInfo = {
-    port: (process.env.PORT === undefined) ? 8080 : Number(process.env.PORT),
+    port: (process.env.PORT === undefined) ? 8081 : Number(process.env.PORT),
 
     frontendUrl: (process.env.FRONTEND_URL === undefined) ? 'http://localhost:3001' : process.env.FRONTEND_URL,
     cdnFolder: (process.env.CDN_FOLDER === undefined) ? 'csv_export' : process.env.CDN_FOLDER,
@@ -32,7 +34,7 @@ export const config: configInfo = {
      * Routes access
      */
     route: {
-        validationPrefix: '/validation'
+        cacheWarmerPrefix: '/cache-warmer'
     },
     rootDir: appRoot.resolve('/'),
     observability: {

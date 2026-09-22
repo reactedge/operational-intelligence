@@ -1,21 +1,32 @@
 import express, { Application } from 'express'
 import { config } from "../config";
 import { initialiseApp } from "./initilisers";
-import { ErrorWrapper } from "../error-handler";
-import { logger } from "../logger";
+import { OpenTelemetryObserver } from "../observability/activity";
 
 export const startServer = async () => {
     const app: Application = express()
     const port = config.port
-    const errorWrapper = new ErrorWrapper()
 
     await initialiseApp(app)
+    const telemetry = app.locals.telemetry as OpenTelemetryObserver;
 
     try {
-        app.listen(port, () => {
-            logger.info('cache_warmer.server.started', { port })
-        })
-    } catch (error: unknown) {
-        errorWrapper.handle(error)
+        await new Promise<void>((resolve, reject) => {
+            const server = app.listen(port, (error?: Error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+
+                resolve();
+            });
+            server.once('error', reject);
+        });
+    } catch (error) {
+        const operation = telemetry.startOperation(
+            'cache_warmer.server.failed',
+            {'server.port': port}
+        );
+        operation.fail(error);
     }
 }
