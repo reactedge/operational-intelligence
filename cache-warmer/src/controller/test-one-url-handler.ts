@@ -7,34 +7,36 @@ export class TestOneUrlHandler {
     testUrl = async (req: Request, res: Response): Promise<void> => {
         const telemetry = req.app.locals.telemetry as OpenTelemetryObserver;
         const requestOperation = res.locals.requestOperation as Operation;
-        let testOperation: Operation | undefined;
+        const suppliedUrl = typeof req.body?.url === 'string'
+            ? req.body.url
+            : '';
+        const testOperation = telemetry.startChildOperation(
+            requestOperation,
+            'cache_warmer.test_url',
+            suppliedUrl.length > 0
+                ? {'cache_warmer.target.url': suppliedUrl}
+                : {}
+        );
 
         try {
-            if (typeof req.body?.url !== 'string' || req.body.url.length === 0) {
-                res.status(400).json({
-                    error: 'A URL is required.'
-                });
-                return;
+            if (suppliedUrl.length === 0) {
+                throw new Error('A URL is required.');
             }
 
-            const targetUrl = normalizeUrl(req.body.url);
-            testOperation = telemetry.startChildOperation(
-                requestOperation,
-                'cache_warmer.test_url',
-                {
-                    'cache_warmer.target.url': targetUrl
-                }
+            const targetUrl = normalizeUrl(suppliedUrl);
+            testOperation.setAttribute(
+                'cache_warmer.target.url',
+                targetUrl
             );
 
+            testOperation.succeed();
             res.json({});
-            testOperation.end();
 
         } catch (e) {
-            res.status(500).json({
-                healthy: false,
+            testOperation.fail(e);
+            res.status(400).json({
                 error: e instanceof Error ? e.message : 'Unknown error'
             });
-            testOperation?.fail(e);
         }
     }
 }

@@ -41,8 +41,7 @@ Requirements: Node.js 20 or later, npm, and Docker.
    ```
 
    Runtime activity is recorded in OpenTelemetry rather than written to the
-   console. Jaeger will contain a `cache_warmer.server.started` span with
-   `server.port=8081`.
+   console. No trace is created until an HTTP journey begins.
 
    To debug instead, open the repository root in VS Code, select **Debug cache warmer**, add a breakpoint in `TestOneUrlHandler.testUrl`, and press F5.
 
@@ -66,7 +65,10 @@ Requirements: Node.js 20 or later, npm, and Docker.
 6. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. The request trace must contain:
 
    - parent span `cache_warmer.request`, with the request method, path, and response status;
-   - child span `cache_warmer.test_url`, with `cache_warmer.target.url` set to the URL supplied above.
+   - child span `cache_warmer.test_url`, with `cache_warmer.target.url` set to the URL supplied above and status `OK`.
+
+   If the action fails, the child span has status `ERROR` and records the
+   exception. The parent span then ends when the HTTP response completes.
 
 The HTTP response proves that the route and controller ran. The parent and child spans prove that telemetry was exported with the tested URL. These checks do not yet prove cache warming; the URL is accepted and traced but is not fetched in this iteration.
 

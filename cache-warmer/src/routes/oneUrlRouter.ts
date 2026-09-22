@@ -26,14 +26,14 @@ export const setupOneUrlRoutes = (app: Application) => {
         res.locals.requestOperation = requestOperation;
 
         res.once('finish', () => {
-            requestOperation.setAttribute(
-                'http.response.status_code',
-                res.statusCode
-            );
-            requestOperation.end();
+            requestOperation.complete(res.statusCode);
         });
 
-        res.once('close', () => requestOperation.end());
+        res.once('close', () => {
+            requestOperation.fail(
+                new Error('Response closed before completion.')
+            );
+        });
         next()
     })
 
