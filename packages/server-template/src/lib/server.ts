@@ -1,22 +1,35 @@
-import express, { Application } from 'express'
-import { config } from "../config";
-import { initialiseApp } from "./initilisers";
-import { ErrorWrapper } from "../error-handler";
+import express, {Application} from 'express'
+import {config} from "../config";
+import {initialiseApp} from "./initilisers";
+import {OpenTelemetryObserver} from "../observability/activity";
 
 export const startServer = async () => {
     const app: Application = express()
     const port = config.port
-    const errorWrapper = new ErrorWrapper()
-
-    console.log('port', port)
 
     await initialiseApp(app)
+    const telemetry = app.locals.telemetry as OpenTelemetryObserver;
 
     try {
-        app.listen(port, () => {
-            console.log(`Server running on port ${port}`)
-        })
-    } catch (error: unknown) {
-        errorWrapper.handle(error)
+        await new Promise<void>((resolve, reject) => {
+            const server = app.listen(port, (error?: Error) => {
+                if (error) {
+                    reject(error);
+                    return;
+                }
+                resolve();
+            });
+            server.once('error', reject);
+        });
+        telemetry.logObservation('__SPAN_PREFIX__.server.started', {
+            'server.port': port
+        });
+    } catch (error) {
+        const operation = telemetry.startOperation(
+            '__SPAN_PREFIX__.server.failed',
+            {'server.port': port}
+        );
+        operation.fail(error);
+        throw error;
     }
 }

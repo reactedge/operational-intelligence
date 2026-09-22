@@ -1,46 +1,26 @@
 import dotenv from 'dotenv';
-dotenv.config();
-import appRoot from 'app-root-path';
+dotenv.config({quiet: true});
 
-export type configInfo = {
+export type Config = {
     port: number;
     frontendUrl: string;
-    cdnFolder: string,
     route: {
-        firstPrefix: string;
-    },
-    rootDir: string;
+        servicePrefix: string;
+    };
     observability: {
         otelHost: string;
         serviceName: string;
-    },
-    openai: {
-        model: string;
-        performance: number;
-        apiKey: string;
-    }
-}
+    };
+};
 
-export const config: configInfo = {
-    port: (process.env.PORT === undefined) ? 8080 : Number(process.env.PORT),
-
-    frontendUrl: (process.env.FRONTEND_URL === undefined) ? 'http://localhost:3001' : process.env.FRONTEND_URL,
-    cdnFolder: (process.env.CDN_FOLDER === undefined) ? 'csv_export' : process.env.CDN_FOLDER,
-
-    /**
-     * Routes access
-     */
+export const config: Config = {
+    port: Number(process.env.PORT ?? '__SERVER_PORT__'),
+    frontendUrl: process.env.FRONTEND_URL ?? 'http://localhost:3000',
     route: {
-        validationPrefix: '/validation'
+        servicePrefix: '__ROUTE_PREFIX__'
     },
-    rootDir: appRoot.resolve('/'),
     observability: {
-        otelHost: (process.env.OTEL_HOST === undefined) ? 'http://localhost:4318' : process.env.OTEL_HOST,
-        serviceName: (process.env.OTEL_HEALTH_SERVICE === undefined) ? 'reactedge-health' : process.env.OTEL_HEALTH_SERVICE,
-    },
-    openai: {
-        model: (process.env.OPENAI_MODEL === undefined) ? 'gpt-4o-mini' : process.env.OPENAI_MODEL,
-        performance: Number(process.env.OPENAI_PERFORMANCE ?? 0.2),
-        apiKey: (process.env.OPENAI_API_KEY === undefined) ? 'rrfdf' : process.env.OPENAI_API_KEY
+        otelHost: process.env.OTEL_HOST ?? 'http://localhost:4318',
+        serviceName: process.env.OTEL_SERVICE_NAME ?? '__OTEL_SERVICE_NAME__'
     }
-}
+};
