@@ -1,6 +1,6 @@
 import {Application} from "express";
-import {setupFirstRoutes} from "./firstRouter";
+import {setupOneUrlRoutes} from "./oneUrlRouter";
 
 export default (app: Application) => {
-    setupFirstRoutes(app)
+    setupOneUrlRoutes(app)
 }

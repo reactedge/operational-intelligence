@@ -2,22 +2,21 @@ import express, { Application, Request, Response, NextFunction } from 'express'
 import { config } from "../config";
 import { corsOptions } from '../lib/cors-setup'
 import { sanitiseUrl } from "../lib/url";
-import { FirstHandler } from "../controller/first-handler"
+import { TestOneUrlHandler } from "../controller/test-one-url-handler"
 
-export const setupFirstRoutes = (app: Application) => {
+export const setupOneUrlRoutes = (app: Application) => {
     const router = express.Router()
     const options = corsOptions();
     router.use(options)
 
-    const FirstController = new FirstHandler()
+    const testOneUrlController = new TestOneUrlHandler()
 
     router.use('/', (req: Request, res: Response, next: NextFunction) => {
-        console.log(`health validation request: ${sanitiseUrl(req.url)}`)
+        console.log(`cache warmer request: ${sanitiseUrl(req.url)}`)
         next()
     })
 
-    router.post("/test", FirstController.test)
-    router.post("/test-url", FirstController.testUrl)
+    router.post("/test-url", testOneUrlController.testUrl)
 
     app.use(config.route.validationPrefix, router)
 }
