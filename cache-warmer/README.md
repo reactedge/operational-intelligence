@@ -4,15 +4,28 @@ Minimal Express skeleton for testing the cache-warmer flow one URL at a time.
 
 ## Run the happy path
 
-Requirements: Node.js 20 or later and npm.
+Requirements: Node.js 20 or later, npm, and Docker.
 
-1. Install dependencies:
+1. Install dependencies and create the local environment file:
 
    ```bash
    npm ci
+   cp .env.sample .env
    ```
 
-2. Start the server:
+2. Start Jaeger with its OpenTelemetry HTTP receiver exposed on port `4318`:
+
+   ```bash
+   docker run --detach --rm \
+     --name reactedge-jaeger \
+     --env COLLECTOR_OTLP_ENABLED=true \
+     --publish 16686:16686 \
+     --publish 4317:4317 \
+     --publish 4318:4318 \
+     jaegertracing/all-in-one:latest
+   ```
+
+3. Start the cache-warmer server:
 
    ```bash
    npm start
@@ -20,7 +33,7 @@ Requirements: Node.js 20 or later and npm.
 
    The default address is `http://localhost:8080`.
 
-3. From another terminal, call the one-URL test endpoint:
+4. From another terminal, call the one-URL test endpoint:
 
    ```bash
    curl --fail --request POST http://localhost:8080/validation/test-url
@@ -32,7 +45,15 @@ Requirements: Node.js 20 or later and npm.
    {}
    ```
 
-This empty response confirms that the route, controller, and telemetry lifecycle are connected. Cache warming and URL input will be added in the next iteration.
+5. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**.
+
+A trace from the request confirms that the route, controller, and telemetry export are connected. The empty response does not yet prove cache warming; URL input and cache-warming behaviour will be added in the next iteration.
+
+Stop Jaeger when finished:
+
+```bash
+docker stop reactedge-jaeger
+```
 
 ## Optional configuration
 
