@@ -4,7 +4,7 @@ import { Application } from "express";
 import { setupTelemetry } from "../../observability/tracing";
 
 export const initialiseApp = async (app: Application) => {
+    setupTelemetry(app)
     access(app)
     routes(app)
-    setupTelemetry(app)
 }

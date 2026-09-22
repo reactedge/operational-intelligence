@@ -1,6 +1,16 @@
-import {Attributes, AttributeValue, Span, SpanStatusCode} from "@opentelemetry/api";
+import {
+    Attributes,
+    AttributeValue,
+    context,
+    type Context,
+    Span,
+    SpanStatusCode,
+    trace
+} from "@opentelemetry/api";
 
 export class Operation {
+    private ended = false;
+
     constructor(
         private readonly span: Span
     ) {}
@@ -19,11 +29,25 @@ export class Operation {
         this.span.setAttribute(key, value);
     }
 
+    getContext(): Context {
+        return trace.setSpan(context.active(), this.span);
+    }
+
     end(): void {
+        if (this.ended) {
+            return;
+        }
+
+        this.ended = true;
         this.span.end();
     }
 
     fail(error: unknown): void {
+        if (this.ended) {
+            return;
+        }
+
+        this.ended = true;
         const err =
             error instanceof Error
                 ? error

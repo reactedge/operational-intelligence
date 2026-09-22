@@ -40,18 +40,19 @@ Requirements: Node.js 20 or later, npm, and Docker.
    npm start
    ```
 
-   Expected terminal output:
-
-   ```text
-   cache_warmer.server.started { port: 8081 }
-   ```
+   Runtime activity is recorded in OpenTelemetry rather than written to the
+   console. Jaeger will contain a `cache_warmer.server.started` span with
+   `server.port=8081`.
 
    To debug instead, open the repository root in VS Code, select **Debug cache warmer**, add a breakpoint in `TestOneUrlHandler.testUrl`, and press F5.
 
 5. From another terminal, call the one-URL endpoint:
 
    ```bash
-   curl -i --request POST http://localhost:8081/validation/test-url
+   curl -i --request POST \
+     --header 'Content-Type: application/json' \
+     --data '{"url":"https://mageosuk.reactedge.net/women/tops-women/jackets-women.html"}' \
+     http://localhost:8081/cache-warmer/test-url
    ```
 
    The response must include `HTTP/1.1 200 OK` and the JSON body:
@@ -60,17 +61,14 @@ Requirements: Node.js 20 or later, npm, and Docker.
    {}
    ```
 
-   The cache-warmer terminal must also show:
-
-   ```text
-   cache_warmer.request.received { url: '/test-url' }
-   ```
-
    If the response mentions Nginx, Magento, or a redirect, the request reached another service rather than the cache-warmer. Confirm that the URL uses port `8081`.
 
-6. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. A `cache_warmer.test_url` trace must be present.
+6. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. The request trace must contain:
 
-The HTTP response proves that the route and controller ran. The terminal event proves that the cache-warmer received the request. The Jaeger trace proves that telemetry was exported. These checks do not yet prove cache warming; URL input and cache-warming behaviour will be added in the next iteration.
+   - parent span `cache_warmer.request`, with the request method, path, and response status;
+   - child span `cache_warmer.test_url`, with `cache_warmer.target.url` set to the URL supplied above.
+
+The HTTP response proves that the route and controller ran. The parent and child spans prove that telemetry was exported with the tested URL. These checks do not yet prove cache warming; the URL is accepted and traced but is not fetched in this iteration.
 
 Stop Jaeger when finished:
 

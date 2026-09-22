@@ -1,5 +1,5 @@
 import dotenv from 'dotenv';
-dotenv.config();
+dotenv.config({quiet: true});
 import appRoot from 'app-root-path';
 
 export type configInfo = {
@@ -8,7 +8,7 @@ export type configInfo = {
     /** Read-only folder for versioned prompts and other operational artefacts. */
     cdnFolder: string,
     route: {
-        validationPrefix: string;
+        cacheWarmerPrefix: string;
     },
     rootDir: string;
     observability: {
@@ -32,7 +32,7 @@ export const config: configInfo = {
      * Routes access
      */
     route: {
-        validationPrefix: '/validation'
+        cacheWarmerPrefix: '/cache-warmer'
     },
     rootDir: appRoot.resolve('/'),
     observability: {

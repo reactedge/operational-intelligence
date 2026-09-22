@@ -3,7 +3,8 @@ import { config } from "../config";
 import { corsOptions } from '../lib/cors-setup'
 import { sanitiseUrl } from "../lib/url";
 import { TestOneUrlHandler } from "../controller/test-one-url-handler"
-import { logger } from "../logger"
+import { OpenTelemetryObserver } from "../observability/activity";
+import { Operation } from "../observability/operation";
 
 export const setupOneUrlRoutes = (app: Application) => {
     const router = express.Router()
@@ -13,13 +14,30 @@ export const setupOneUrlRoutes = (app: Application) => {
     const testOneUrlController = new TestOneUrlHandler()
 
     router.use('/', (req: Request, res: Response, next: NextFunction) => {
-        logger.info('cache_warmer.request.received', {
-            url: sanitiseUrl(req.url)
-        })
+        const telemetry = req.app.locals.telemetry as OpenTelemetryObserver;
+        const requestOperation = telemetry.startOperation(
+            'cache_warmer.request',
+            {
+                'http.request.method': req.method,
+                'url.path': sanitiseUrl(req.originalUrl)
+            }
+        );
+
+        res.locals.requestOperation = requestOperation;
+
+        res.once('finish', () => {
+            requestOperation.setAttribute(
+                'http.response.status_code',
+                res.statusCode
+            );
+            requestOperation.end();
+        });
+
+        res.once('close', () => requestOperation.end());
         next()
     })
 
     router.post("/test-url", testOneUrlController.testUrl)
 
-    app.use(config.route.validationPrefix, router)
+    app.use(config.route.cacheWarmerPrefix, router)
 }
