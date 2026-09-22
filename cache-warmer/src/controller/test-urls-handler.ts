@@ -25,11 +25,7 @@ export class TestUrlsHandler {
 
     testUrls = async (req: Request, res: Response): Promise<void> => {
         const telemetry = req.app.locals.telemetry as OpenTelemetryObserver;
-        const requestOperation = res.locals.requestOperation as Operation;
-        const operation = telemetry.startChildOperation(
-            requestOperation,
-            'cache_warmer.test_urls'
-        );
+        const operation = res.locals.routeOperation as Operation;
 
         let urls: string[];
 
