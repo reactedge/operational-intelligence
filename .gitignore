@@ -1,0 +1,60 @@
+.idea
+node_modules
+.env
+
+archive/*
+# Node
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+coverage/
+
+# Vite
+.vite/
+
+# TypeScript
+*.tsbuildinfo
+
+# Environment
+.env.*
+!.env.sample
+
+# IDE
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+logs/
+*.log
+
+# Runtime
+tmp/
+.temp/
+temp
+
+# SSL certificates
+*.pem
+*.key
+*.crt
+
+# OpenTelemetry
+*.trace
+*.span
+# Python bytecode
+__pycache__/
+*.py[cod]
+
+# Virtual environments
+venv/
+.venv/
+
+# Test cache
+.pytest_cache/
+

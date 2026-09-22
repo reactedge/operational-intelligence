@@ -1,0 +1,12 @@
+from fastapi import FastAPI
+from app.config import settings
+from app.config import output_config
+from app.routes.status import router as status_router
+
+app = FastAPI()
+
+@app.on_event("startup")
+async def startup_event():
+    output_config()
+
+app.include_router(status_router)
