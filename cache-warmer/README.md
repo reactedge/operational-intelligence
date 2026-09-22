@@ -1,6 +1,7 @@
 # Cache warmer
 
-Minimal Express skeleton for testing the cache-warmer flow one URL at a time.
+Sequential cache warmer that checks platform signals before progressing to the
+next URL.
 
 ## Run and verify the happy path
 
@@ -34,7 +35,16 @@ Requirements: Node.js 20 or later, npm, and Docker.
      jaegertracing/all-in-one:latest
    ```
 
-4. Start the cache-warmer:
+4. Start the Platform Signals service and verify its status contract:
+
+   ```bash
+   curl --fail http://127.0.0.1:8000/status
+   ```
+
+   The response must contain `cpu`, `memory`, `disk`, `redis`, and `varnish`
+   under `signals`.
+
+5. Start the cache-warmer:
 
    ```bash
    npm start
@@ -45,27 +55,26 @@ Requirements: Node.js 20 or later, npm, and Docker.
 
    To debug instead, open the repository root in VS Code, select **Debug cache warmer**, add a breakpoint in `TestOneUrlHandler.testUrl`, and press F5.
 
-5. From another terminal, call the one-URL endpoint:
+6. From another terminal, submit exactly two URLs:
 
    ```bash
    curl -i --request POST \
      --header 'Content-Type: application/json' \
-     --data '{"url":"https://mageosuk.reactedge.net/women/tops-women/jackets-women.html"}' \
-     http://localhost:8081/cache-warmer/test-url
+     --data '{"urls":["https://mageosuk.reactedge.net/women/tops-women/jackets-women.html","https://mageosuk.reactedge.net/women/tops-women/coats-women.html"]}' \
+     http://localhost:8081/cache-warmer/test-urls
    ```
 
    The response must include `HTTP/1.1 200 OK` and a measured result similar to:
 
    ```json
    {
-     "id": "requested-url",
-     "label": "Requested URL",
-     "url": "https://mageosuk.reactedge.net/women/tops-women/jackets-women.html",
-     "status": 200,
-     "durationMs": 245.3,
-     "healthy": true,
-     "cacheStatus": "MISS",
-     "cacheHit": false
+     "status": "completed",
+     "results": [
+       {"id": "url-1", "status": 200, "healthy": true},
+       {"id": "url-2", "status": 200, "healthy": true}
+     ],
+     "gate": {"allowed": true, "reasons": []},
+     "platform": {"signals": {}}
    }
    ```
 
@@ -75,18 +84,20 @@ Requirements: Node.js 20 or later, npm, and Docker.
 
    If the response mentions Nginx, Magento, or a redirect, the request reached another service rather than the cache-warmer. Confirm that the URL uses port `8081`.
 
-6. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. The request trace must contain:
+7. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. The request trace must contain:
 
    - parent span `cache_warmer.request`, with the request method, path, and response status;
-   - child span `cache_warmer.test_url`, with `cache_warmer.target.url` set to the URL supplied above and status `OK`;
-   - child span `cache_warmer.load_url`, containing the upstream HTTP, duration, and cache observations.
+   - child span `cache_warmer.test_urls` for the sequential operation;
+   - `cache_warmer.load_url` for URL 1;
+   - `cache_warmer.platform_status` and `cache_warmer.second_url_gate`;
+   - `cache_warmer.load_url` for URL 2 only when the gate allows it.
 
    If the action fails, the child span has status `ERROR` and records the
    exception. The parent span then ends when the HTTP response completes.
 
-The HTTP response proves that `BatchLoader` fetched the configured URL. The
-spans preserve the request, action, and individual URL-load boundaries that
-will remain when a later iteration supplies multiple entries.
+When the first result or platform signals breach policy, the response uses
+`status: "stopped"`, contains only the first result, and explains the decision
+in `gate.reasons`. This is a completed safety decision, not an HTTP failure.
 
 Stop Jaeger when finished:
 
@@ -99,5 +110,10 @@ docker stop reactedge-jaeger
 - `PORT`: server port; defaults to `8081`.
 - `FRONTEND_URL`: comma-separated browser origins allowed by CORS; defaults to `http://localhost:3001`.
 - `CACHE_WARMER_ALLOWED_HOSTS`: comma-separated hostnames the server may fetch; defaults to `mageosuk.reactedge.net`.
+- `PLATFORM_SIGNALS_STATUS_URL`: Platform Signals status endpoint; defaults to `http://127.0.0.1:8000/status`.
+- `PLATFORM_SIGNALS_TIMEOUT_MS`: status request timeout; defaults to `5000`.
+- `PLATFORM_MAX_CPU_PERCENT`: maximum CPU usage before stopping; defaults to `85`.
+- `PLATFORM_MAX_MEMORY_PERCENT`: maximum memory usage before stopping; defaults to `85`.
+- `PLATFORM_MAX_DISK_PERCENT`: maximum disk usage before stopping; defaults to `90`.
 - `OTEL_HOST`: OpenTelemetry collector address; defaults to `http://localhost:4318`.
 - `OTEL_CACHE_WARMER_SERVICE`: telemetry service name; defaults to `reactedge-cache-warmer`.
