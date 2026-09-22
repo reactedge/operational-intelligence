@@ -23,6 +23,9 @@ export const setupOneUrlRoutes = (app: Application) => {
             }
         );
 
+        // res.locals can resemble shared application state, but Express creates
+        // it for this response only. Concurrent requests therefore retain their
+        // own parent operation and cannot overwrite one another's trace state.
         res.locals.requestOperation = requestOperation;
 
         res.once('finish', () => {

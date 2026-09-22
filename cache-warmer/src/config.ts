@@ -1,4 +1,6 @@
 import dotenv from 'dotenv';
+// dotenv v17 prints an injection message by default. Keep runtime output in
+// OpenTelemetry by preventing the configuration loader from writing to stdout.
 dotenv.config({quiet: true});
 import appRoot from 'app-root-path';
 
