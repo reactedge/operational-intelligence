@@ -1,12 +1,13 @@
 {
-  "name": "@reactedge/start-server",
+  "name": "@reactedge/__SERVICE_SLUG__",
   "version": "0.1.0",
   "private": true,
-  "description": "Template for an Express server",
+  "description": "__SERVICE_NAME__ Express service",
   "type": "module",
   "scripts": {
-    "dev": "NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/caddy-root.crt  tsx watch src/index.ts",
-    "start": "tsx src/index.ts"
+    "dev": "tsx watch src/index.ts",
+    "start": "node --import tsx src/index.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
@@ -14,17 +15,13 @@
     "@opentelemetry/resources": "^2.8.0",
     "@opentelemetry/sdk-trace-base": "^2.8.0",
     "@opentelemetry/sdk-trace-node": "^2.8.0",
-    "app-root-path": "^3.1.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1",
-    "jsdom": "^29.1.1",
-    "openai": "^6.44.0",
-    "zod": "^4.4.3"
+    "express": "^5.2.1"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
-    "@types/jsdom": "^28.0.3",
     "@types/node": "^26.0.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3"

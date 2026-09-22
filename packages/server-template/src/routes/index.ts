@@ -1,6 +1,6 @@
 import {Application} from "express";
-import {setupFirstRoutes} from "./firstRouter";
+import {setupStatusRoutes} from "./status-router";
 
 export default (app: Application) => {
-    setupFirstRoutes(app)
+    setupStatusRoutes(app)
 }
