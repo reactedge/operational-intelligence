@@ -12,6 +12,16 @@ export type configInfo = {
     route: {
         cacheWarmerPrefix: string;
     },
+    cacheWarmer: {
+        allowedHosts: string[];
+    },
+    platformSignals: {
+        statusUrl: string;
+        timeoutMs: number;
+        maxCpuPercent: number;
+        maxMemoryPercent: number;
+        maxDiskPercent: number;
+    },
     rootDir: string;
     observability: {
         otelHost: string;
@@ -35,6 +45,23 @@ export const config: configInfo = {
      */
     route: {
         cacheWarmerPrefix: '/cache-warmer'
+    },
+    cacheWarmer: {
+        allowedHosts: (
+            process.env.CACHE_WARMER_ALLOWED_HOSTS
+            ?? 'mageosuk.reactedge.net'
+        )
+            .split(',')
+            .map(host => host.trim())
+            .filter(Boolean)
+    },
+    platformSignals: {
+        statusUrl: process.env.PLATFORM_SIGNALS_STATUS_URL
+            ?? 'http://127.0.0.1:8000/status',
+        timeoutMs: Number(process.env.PLATFORM_SIGNALS_TIMEOUT_MS ?? 5000),
+        maxCpuPercent: Number(process.env.PLATFORM_MAX_CPU_PERCENT ?? 85),
+        maxMemoryPercent: Number(process.env.PLATFORM_MAX_MEMORY_PERCENT ?? 85),
+        maxDiskPercent: Number(process.env.PLATFORM_MAX_DISK_PERCENT ?? 90)
     },
     rootDir: appRoot.resolve('/'),
     observability: {

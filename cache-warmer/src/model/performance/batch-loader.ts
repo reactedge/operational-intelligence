@@ -1,148 +1,95 @@
-import { SitemapEntry, PerformanceEntry } from "./types";
-import { UrlLoader } from "./url-loader";
-import { config } from "../../config"
-import { OpenTelemetryObserver } from "../../observability/activity"
-import { savePlatformStatusSnapshot } from "../platform/call-platform";
+import {SitemapEntry, PerformanceEntry} from "./types";
+import {UrlLoader} from "./url-loader";
+import {OpenTelemetryObserver} from "../../observability/activity";
+import {Operation} from "../../observability/operation";
 
 export class BatchLoader {
     constructor(
         private readonly urlLoader: UrlLoader
-    ) {
-    }
+    ) {}
 
     async measure(
         entries: SitemapEntry[],
-        telemetry: OpenTelemetryObserver
+        telemetry: OpenTelemetryObserver,
+        parentOperation: Operation
     ): Promise<PerformanceRun> {
         const run = new PerformanceRun();
 
-        let failures = 0;
-
-        for (let i = 0; i < entries.length; i++) {
-            const entry = entries[i];
-
-            if (i > 0 && i % config.health.platformSnapshotInterval === 0) {
-                await savePlatformStatusSnapshot(telemetry);
-            }
-
-            const load = await this.loadUrl(entry, telemetry);
-
-            if (load) {
-                run.add(load);
-            } else {
-                telemetry.logObservation(
-                    'cache_warmer.page.failed',
-                    {
-                        'page.id': entry.id,
-                        'page.url': entry.url,
-                        'failure.count': failures,
-                        'failure.max': config.sitemap.maxFailures
-                    }
-                );
-
-                failures++;
-
-                if (failures >= config.sitemap.maxFailures) {
-                    telemetry.logObservation(
-                        'cache_warmer.run.aborted',
-                        {
-                            'failure.count': failures
-                        }
-                    );
-
-                    break;
-                }
-            }
+        for (const entry of entries) {
+            run.add(
+                await this.loadUrl(
+                    entry,
+                    telemetry,
+                    parentOperation
+                )
+            );
         }
 
         return run;
     }
 
-    async measureColdUrls(
-        coldRun: PerformanceRun,
-        telemetry: OpenTelemetryObserver
-    ): Promise<PerformanceRun> {
-        const run = new PerformanceRun();
-
-        let failures = 0;
-
-        for (const entry of coldRun.getEntries()) {
-            if (entry.cacheHit) {
-                run.add(entry);
-                continue;
-            }
-
-            const load = await this.loadUrl(entry, telemetry)
-
-            if (!load) {
-                telemetry.logObservation(
-                    'cache_warmer.page.failed',
-                    {
-                        'page.id': entry.id,
-                        'page.url': entry.url,
-                        'failure.count': failures,
-                        'failure.max': config.sitemap.maxFailures
-                    }
-                );
-
-                failures++;
-
-                if (failures >= config.sitemap.maxFailures) {
-                    telemetry.logObservation(
-                        'cache_warmer.run.aborted',
-                        {
-                            'failure.count': failures
-                        }
-                    );
-
-                    break;
-                }
-            } else {
-                run.add(load);
-            }
-        }
-
-        return run;
-    }
-
-    async loadUrl(entry: SitemapEntry, telemetry: OpenTelemetryObserver) {
-        telemetry.logObservation(
-            'cache_warmer.page.started',
+    async loadUrl(
+        entry: SitemapEntry,
+        telemetry: OpenTelemetryObserver,
+        parentOperation: Operation
+    ): Promise<PerformanceEntry> {
+        const loadOperation = telemetry.startChildOperation(
+            parentOperation,
+            'cache_warmer.load_url',
             {
-                'page.id': entry.id,
-                'page.label': entry.label,
-                'page.url': entry.url
+                'cache_warmer.page.id': entry.id,
+                'cache_warmer.page.label': entry.label,
+                'url.full': entry.url
             }
         );
 
-        const result =
-            await this.urlLoader.fetchText(entry.url);
+        const result = await this.urlLoader.fetchText(entry.url);
 
-        telemetry.logObservation(
-            'cache_warmer.page.completed',
-            {
-                'page.id': entry.id,
-                'page.label': entry.label,
-                'page.url': entry.url,
-                'http.status': result.status,
-                'duration.ms': result.durationMs,
-                'healthy': result.healthy
-            }
+        loadOperation.setAttribute('cache_warmer.healthy', result.healthy);
+        loadOperation.setAttribute('cache_warmer.duration.ms', result.durationMs);
+
+        if (result.status !== undefined) {
+            loadOperation.setAttribute('http.response.status_code', result.status);
+        }
+
+        if (result.cacheStatus !== undefined) {
+            loadOperation.setAttribute(
+                'cache_warmer.cache.status',
+                result.cacheStatus
+            );
+        }
+
+        loadOperation.setAttribute(
+            'cache_warmer.cache.hit',
+            result.cacheHit ?? false
         );
 
         if (result.healthy) {
-            return {
-                id: entry.id,
-                label: entry.label,
-                url: entry.url,
-                ...result
-            };
+            loadOperation.succeed();
+        } else {
+            loadOperation.fail(
+                new Error(
+                    result.error
+                    ?? `Target returned HTTP ${result.status ?? 'unknown'}`
+                )
+            );
         }
+
+        return {
+            id: entry.id,
+            label: entry.label,
+            url: entry.url,
+            status: result.status,
+            durationMs: result.durationMs,
+            healthy: result.healthy,
+            cacheStatus: result.cacheStatus,
+            cacheHit: result.cacheHit,
+            error: result.error
+        };
     }
 }
 
 export class PerformanceRun {
-
     private readonly entries = new Map<string, PerformanceEntry>();
 
     add(entry: PerformanceEntry): void {

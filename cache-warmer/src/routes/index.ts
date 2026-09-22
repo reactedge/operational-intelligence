@@ -1,6 +1,6 @@
 import {Application} from "express";
-import {setupOneUrlRoutes} from "./oneUrlRouter";
+import {setupCacheWarmerRoutes} from "./cacheWarmerRouter";
 
 export default (app: Application) => {
-    setupOneUrlRoutes(app)
+    setupCacheWarmerRoutes(app)
 }

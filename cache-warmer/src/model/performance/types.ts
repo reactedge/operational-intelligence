@@ -18,7 +18,8 @@ export interface PerformanceEntry {
     cacheHit?: boolean,
     durationMs: number;
     healthy: boolean;
-
+    status?: number;
+    error?: string;
 }
 
 export type PerformanceType = 'baseline' | 'verification';
