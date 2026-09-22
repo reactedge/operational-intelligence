@@ -29,9 +29,9 @@ export class PerformanceValidator {
             const initial =
                 await batchLoader.measure(urls, telemetry);
 
-            console.log(
-                'initial run completed',
-                initial.getEntries().length
+            telemetry.logObservation(
+                'cache_warmer.initial_run.completed',
+                { 'url.count': initial.getEntries().length }
             );
 
             const verification =
@@ -40,9 +40,9 @@ export class PerformanceValidator {
                     telemetry
                 );
 
-            console.log(
-                'verification run completed',
-                verification.getEntries().length
+            telemetry.logObservation(
+                'cache_warmer.verification_run.completed',
+                { 'url.count': verification.getEntries().length }
             );
 
             return this.compare(
@@ -54,9 +54,9 @@ export class PerformanceValidator {
 
             this.stopBackgroundTraffic();
 
-            console.log(
-                'health.background.requests',
-                this.backgroundRequestCount
+            telemetry.logObservation(
+                'cache_warmer.background_requests.completed',
+                { 'request.count': this.backgroundRequestCount }
             );
 
             await traffic;

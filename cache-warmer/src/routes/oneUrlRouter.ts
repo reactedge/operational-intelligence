@@ -3,6 +3,7 @@ import { config } from "../config";
 import { corsOptions } from '../lib/cors-setup'
 import { sanitiseUrl } from "../lib/url";
 import { TestOneUrlHandler } from "../controller/test-one-url-handler"
+import { logger } from "../logger"
 
 export const setupOneUrlRoutes = (app: Application) => {
     const router = express.Router()
@@ -12,7 +13,9 @@ export const setupOneUrlRoutes = (app: Application) => {
     const testOneUrlController = new TestOneUrlHandler()
 
     router.use('/', (req: Request, res: Response, next: NextFunction) => {
-        console.log(`cache warmer request: ${sanitiseUrl(req.url)}`)
+        logger.info('cache_warmer.request.received', {
+            url: sanitiseUrl(req.url)
+        })
         next()
     })
 

@@ -5,6 +5,7 @@ import appRoot from 'app-root-path';
 export type configInfo = {
     port: number;
     frontendUrl: string;
+    /** Read-only folder for versioned prompts and other operational artefacts. */
     cdnFolder: string,
     route: {
         validationPrefix: string;
@@ -36,7 +37,7 @@ export const config: configInfo = {
     rootDir: appRoot.resolve('/'),
     observability: {
         otelHost: (process.env.OTEL_HOST === undefined) ? 'http://localhost:4318' : process.env.OTEL_HOST,
-        serviceName: (process.env.OTEL_HEALTH_SERVICE === undefined) ? 'reactedge-health' : process.env.OTEL_HEALTH_SERVICE,
+        serviceName: (process.env.OTEL_CACHE_WARMER_SERVICE === undefined) ? 'reactedge-cache-warmer' : process.env.OTEL_CACHE_WARMER_SERVICE,
     },
     openai: {
         model: (process.env.OPENAI_MODEL === undefined) ? 'gpt-4o-mini' : process.env.OPENAI_MODEL,

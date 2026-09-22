@@ -1,20 +1,19 @@
-import { SpanStatusCode } from '@opentelemetry/api';
-
 import { logger } from './logger';
+import { OpenTelemetryObserver } from './observability/activity';
 
 export class Operation {
-    private readonly telemetry;
+    private readonly telemetry: OpenTelemetryObserver;
 
-    private requestId: string;
+    private requestId = '';
 
-    private userAgent: string;
+    private userAgent = '';
 
-    private traceId: string;
+    private traceId = '';
 
-    private parentSpanId: string;
+    private parentSpanId = '';
 
-    constructor() {
-        //this.telemetry = new OpenTelemetryObserver();
+    constructor(telemetry: OpenTelemetryObserver) {
+        this.telemetry = telemetry;
     }
     registerStart(headers: Record<string, any>): void {
         this.traceId = headers['x-trace-id'] ?? '';
@@ -22,12 +21,9 @@ export class Operation {
         this.userAgent = headers['user-agent'] ?? '';
         this.requestId = crypto.randomUUID();
 
-        this.telemetry.startOperation(
-            this.traceId,
-            this.parentSpanId
-        );
+        this.telemetry.startOperation('cache_warmer.run', headers);
 
-        logger.info('[FEATURE HEALTH START]', {
+        logger.info('cache_warmer.run.started', {
             requestId: this.requestId,
             traceId: this.traceId,
             parentSpanId: this.parentSpanId
@@ -35,45 +31,45 @@ export class Operation {
     }
 
     logObservation(payload: {
-        widget: string;
+        url: string;
         check: string;
     }): void {
-        logger.info('[FEATURE HEALTH OBSERVATION]', {
+        logger.info('cache_warmer.observation.completed', {
             requestId: this.requestId,
-            widget: payload.widget,
+            url: payload.url,
             check: payload.check,
             userAgent: this.userAgent
         });
 
-        this.telemetry.addEvent('observation.completed', {
+        this.telemetry.logObservation('cache_warmer.observation.completed', {
             requestId: this.requestId,
-            widget: payload.widget,
+            url: payload.url,
             check: payload.check
         });
     }
 
     logAssessment(result: {
-        widget: string;
-        healthy: boolean;
+        url: string;
+        ready: boolean;
         issue?: string;
     }): void {
-        logger.info('[FEATURE HEALTH ASSESSMENT]', {
+        logger.info('cache_warmer.assessment.completed', {
             requestId: this.requestId,
-            widget: result.widget,
-            healthy: result.healthy,
+            url: result.url,
+            ready: result.ready,
             issue: result.issue
         });
 
-        this.telemetry.addEvent('assessment.completed', {
+        this.telemetry.logObservation('cache_warmer.assessment.completed', {
             requestId: this.requestId,
-            widget: result.widget,
-            healthy: result.healthy,
+            url: result.url,
+            ready: result.ready,
             issue: result.issue
         });
     }
 
     logCompletion(): void {
-        logger.info('[FEATURE HEALTH COMPLETE]', {
+        logger.info('cache_warmer.run.completed', {
             requestId: this.requestId
         });
 
@@ -81,21 +77,12 @@ export class Operation {
     }
 
     logFailure(error: unknown): void {
-        logger.error('[FEATURE HEALTH FAILED]', {
+        logger.error('cache_warmer.run.failed', {
             requestId: this.requestId,
             error
         });
 
         this.telemetry.failOperation(error);
-
-        this.telemetry.addEvent('operation.failed', {
-            requestId: this.requestId
-        });
-
-        this.telemetry.setStatus(
-            SpanStatusCode.ERROR,
-            error instanceof Error ? error.message : 'Unknown error'
-        );
     }
 
     getRequestId(): string {

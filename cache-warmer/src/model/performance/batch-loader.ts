@@ -31,7 +31,7 @@ export class BatchLoader {
                 run.add(load);
             } else {
                 telemetry.logObservation(
-                    'health.performance.page.failed',
+                    'cache_warmer.page.failed',
                     {
                         'page.id': entry.id,
                         'page.url': entry.url,
@@ -44,7 +44,7 @@ export class BatchLoader {
 
                 if (failures >= config.sitemap.maxFailures) {
                     telemetry.logObservation(
-                        'health.performance.aborted',
+                        'cache_warmer.run.aborted',
                         {
                             'failure.count': failures
                         }
@@ -76,7 +76,7 @@ export class BatchLoader {
 
             if (!load) {
                 telemetry.logObservation(
-                    'health.performance.page.failed',
+                    'cache_warmer.page.failed',
                     {
                         'page.id': entry.id,
                         'page.url': entry.url,
@@ -89,7 +89,7 @@ export class BatchLoader {
 
                 if (failures >= config.sitemap.maxFailures) {
                     telemetry.logObservation(
-                        'health.performance.aborted',
+                        'cache_warmer.run.aborted',
                         {
                             'failure.count': failures
                         }
@@ -107,7 +107,7 @@ export class BatchLoader {
 
     async loadUrl(entry: SitemapEntry, telemetry: OpenTelemetryObserver) {
         telemetry.logObservation(
-            'health.performance.page.started',
+            'cache_warmer.page.started',
             {
                 'page.id': entry.id,
                 'page.label': entry.label,
@@ -115,12 +115,11 @@ export class BatchLoader {
             }
         );
 
-        console.log('visit url', entry.url)
         const result =
             await this.urlLoader.fetchText(entry.url);
 
         telemetry.logObservation(
-            'health.performance.page.completed',
+            'cache_warmer.page.completed',
             {
                 'page.id': entry.id,
                 'page.label': entry.label,

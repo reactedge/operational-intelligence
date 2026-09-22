@@ -6,10 +6,6 @@ export const normalizeUrl = (rawUrl: string) => {
     // Normalize pathname by collapsing multiple slashes
     url.pathname = url.pathname.replace(/\/{2,}/g, '/');
 
-    // Also clean search parameters and hash if needed (optional)
-    // url.search = decodeURIComponent(url.search);
-    // url.hash = decodeURIComponent(url.hash);
-
     return url.toString();
 }
 

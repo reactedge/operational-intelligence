@@ -9,8 +9,6 @@ import {Operation} from "./operation";
 export class OpenTelemetryObserver {
     private span?: Span
 
-    private childSpan?: Span
-
     private tracer: Tracer
     constructor() {
         const exporter = new OTLPTraceExporter({
@@ -30,41 +28,6 @@ export class OpenTelemetryObserver {
         provider.register();
 
         this.tracer = trace.getTracer(config.observability.serviceName);
-        // // 1. Dummy parent span
-        // const parentSpan =
-        //     this.tracer.startSpan(
-        //         'dummy.operation'
-        //     );
-        //
-        // // 2. Event on parent span
-        // parentSpan.addEvent(
-        //     'parent.started',
-        //     {
-        //         status: 'ok'
-        //     }
-        // );
-        //
-        // // 3. Child span
-        // const childSpan =
-        //     this.tracer.startSpan(
-        //         'dummy.child.operation',
-        //         undefined,
-        //         trace.setSpan(
-        //             context.active(),
-        //             parentSpan
-        //         )
-        //     );
-        //
-        // // 4. Event on child span
-        // childSpan.addEvent(
-        //     'child.started',
-        //     {
-        //         widget: 'usp'
-        //     }
-        // );
-        //
-        // childSpan.end();
-        // parentSpan.end();
     }
 
     startOperation(name: string, headers: Request['headers']): void {
@@ -100,9 +63,6 @@ export class OpenTelemetryObserver {
     }
 
     endOperation() {
-        // this.addEvent('api_reponse',{
-        //     'ssr.html.length': resultLength
-        // });
         if (this.span === undefined) {
             throw new Error('No operation was started')
         }

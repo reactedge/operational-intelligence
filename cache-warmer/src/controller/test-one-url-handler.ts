@@ -9,6 +9,7 @@ export class TestOneUrlHandler {
             telemetry.startOperation('cache_warmer.test_url', req.headers);
 
             res.json({});
+            telemetry.endOperation();
 
         } catch (e) {
             res.status(500).json({

@@ -1,12 +1,13 @@
 import {config} from "../config";
 import cors from "cors"
 
-// https://brianflove.com/posts/2017-03-22-express-cors-typescript/
 export const corsOptions = () => {
     const allowedOrigins = config.frontendUrl
         .split(',')
         .map(origin => origin.trim())
 
+    // The API is currently callable server-to-server. CORS is retained for the
+    // planned browser-based operator UI and restricts it to configured origins.
     const options = {
         allowedHeaders: [
             'Origin',
