@@ -12,6 +12,9 @@ export type configInfo = {
     route: {
         cacheWarmerPrefix: string;
     },
+    cacheWarmer: {
+        allowedHosts: string[];
+    },
     rootDir: string;
     observability: {
         otelHost: string;
@@ -35,6 +38,15 @@ export const config: configInfo = {
      */
     route: {
         cacheWarmerPrefix: '/cache-warmer'
+    },
+    cacheWarmer: {
+        allowedHosts: (
+            process.env.CACHE_WARMER_ALLOWED_HOSTS
+            ?? 'mageosuk.reactedge.net'
+        )
+            .split(',')
+            .map(host => host.trim())
+            .filter(Boolean)
     },
     rootDir: appRoot.resolve('/'),
     observability: {
