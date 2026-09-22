@@ -23,7 +23,7 @@ export type configInfo = {
 }
 
 export const config: configInfo = {
-    port: (process.env.PORT === undefined) ? 8080 : Number(process.env.PORT),
+    port: (process.env.PORT === undefined) ? 8081 : Number(process.env.PORT),
 
     frontendUrl: (process.env.FRONTEND_URL === undefined) ? 'http://localhost:3001' : process.env.FRONTEND_URL,
     cdnFolder: (process.env.CDN_FOLDER === undefined) ? 'csv_export' : process.env.CDN_FOLDER,
