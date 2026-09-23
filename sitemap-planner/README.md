@@ -1,14 +1,27 @@
 # Sitemap Planner
 
 Transforms a remote sitemap into a cache-planning contract with request-scoped
-OpenTelemetry tracing.
+OpenTelemetry tracing. It can either return the complete plan or select a
+bounded subset and synchronously delegate it to cache-warmer.
+
+For the full multi-service startup and verification journey, see the
+repository root README.
+
+## Boundaries
+
+Sitemap Planner owns sitemap fetching, planning metadata, filtering, and
+ranking. It does not measure page response times or decide whether the platform
+is safe. Those responsibilities belong to cache-warmer and Platform Signals.
+
+The service currently supports sitemap URL sets (`<urlset>`), not sitemap
+indexes (`<sitemapindex>`).
 
 ## Run
 
 ```bash
 cp .env.sample .env
 npm install
-npm start
+NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/caddy-root.crt npm run dev
 ```
 
 Verify the example route:
@@ -22,7 +35,7 @@ Create a plan:
 ```bash
 curl --fail --request POST \
   --header 'Content-Type: application/json' \
-  --data '{"sitemapUrl":"https://mageosuk.reactedge.net/sitemap.xml"}' \
+  --data '{"sitemapUrl":"https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml"}' \
   http://localhost:8082/sitemap-planner/plan
 ```
 
@@ -49,7 +62,9 @@ The `targetResponseTimeMs` value is a target used for selection. The cache
 warmer's result contains the measured duration; the target is not presented as
 an observed response time.
 
-Start cache-warmer on port `8081`, then choose one of these configurations.
+Start Platform Signals on port `8000` and cache-warmer on port `8081`, then
+choose one of these configurations. The request remains open until
+cache-warmer completes or stops the selected batch.
 
 ### Critical pages
 
@@ -59,7 +74,7 @@ Select two priority-5 pages with a target no slower than 200 ms:
 curl --fail --request POST \
   --header 'Content-Type: application/json' \
   --data '{
-    "sitemapUrl": "https://mageosuk.reactedge.net/sitemap.xml",
+    "sitemapUrl": "https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml",
     "selection": {
       "requiredTags": ["must_be_cached"],
       "maximumTargetResponseTimeMs": 200,
@@ -78,7 +93,7 @@ Select up to five URLs at priority 4 or above with a 400 ms target:
 curl --fail --request POST \
   --header 'Content-Type: application/json' \
   --data '{
-    "sitemapUrl": "https://mageosuk.reactedge.net/sitemap.xml",
+    "sitemapUrl": "https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml",
     "selection": {
       "requiredTags": ["must_be_cached"],
       "maximumTargetResponseTimeMs": 400,
@@ -97,7 +112,7 @@ Select the ten highest-priority matching URLs:
 curl --fail --request POST \
   --header 'Content-Type: application/json' \
   --data '{
-    "sitemapUrl": "https://mageosuk.reactedge.net/sitemap.xml",
+    "sitemapUrl": "https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml",
     "selection": {
       "requiredTags": ["must_be_cached"],
       "maximumTargetResponseTimeMs": 400,
@@ -117,3 +132,26 @@ Configuration:
 - `CACHE_WARMER_URL`: delegation endpoint; defaults to
   `http://localhost:8081/cache-warmer/test-urls`.
 - `CACHE_WARMER_TIMEOUT_MS`: delegation timeout; defaults to `60000`.
+
+## Confirm that it works
+
+1. `GET /sitemap-planner/status` returns `{"status":"ok"}`.
+2. `POST /sitemap-planner/plan` returns the fetched sitemap URL, a count, and
+   planned entries without calling cache-warmer.
+3. `POST /sitemap-planner/warm` returns only the selected entries and a
+   `cacheWarmer` result.
+4. Jaeger lists `reactedge-sitemap-planner` and shows fetch, transform, select,
+   and delegation child spans for the `/warm` request.
+
+During diagnosis, use `curl -i` instead of `curl --fail`; otherwise curl hides
+the JSON body that explains an HTTP error.
+
+If Node reports `UNABLE_TO_GET_ISSUER_CERT_LOCALLY`, the process was not
+started with the local Caddy CA. Confirm the trust independently:
+
+```bash
+NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/caddy-root.crt \
+node -e "fetch('https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml').then(r => console.log(r.status)).catch(e => console.error(e.cause ?? e))"
+```
+
+Expected output: `200`.
