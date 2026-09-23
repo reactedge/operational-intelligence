@@ -24,6 +24,10 @@ The implemented journey is synchronous:
 There is no background worker or persistent job queue in this version. The
 caller waits for the complete selection and warming journey to finish.
 
+See [the end-to-end flow](docs/end-to-end-flow.md) for the runnable development
+journey, the deliverable to inspect after every step, and the durable worker
+flow that remains to be implemented.
+
 ```mermaid
 flowchart TD
     Client["Client"] --> Planner["Sitemap planner :8082"]
@@ -178,7 +182,7 @@ curl -i --request POST \
       "limit": 2
     }
   }' \
-  http://localhost:8082/sitemap-planner/warm
+  http://localhost:8082/sitemap-planner/dev-warm
 ```
 
 Use `-i` rather than `--fail` during diagnosis so an error response body is
@@ -201,7 +205,7 @@ The trace should contain:
 
 ```text
 sitemap_planner.request
-└── sitemap_planner.warm
+└── sitemap_planner.dev_warm
     ├── sitemap_planner.fetch_sitemap
     ├── sitemap_planner.transform
     ├── sitemap_planner.select

@@ -9,7 +9,14 @@ import {SitemapSelectionConfig} from '../model/sitemap/types';
 import {OpenTelemetryObserver} from '../observability/activity';
 import {Operation} from '../observability/operation';
 
-export class WarmSitemapHandler {
+/**
+ * Development-only synchronous integration journey.
+ *
+ * This handler fetches and plans the sitemap on every request, selects one
+ * batch, and waits for cache-warmer to finish. Production job orchestration
+ * must use a persisted plan and a background worker instead of this endpoint.
+ */
+export class DevWarmSitemapHandler {
     constructor(
         private readonly sitemapClient = new SitemapClient(
             config.sitemap.allowedHosts,
@@ -24,7 +31,7 @@ export class WarmSitemapHandler {
         )
     ) {}
 
-    warm = async (req: Request, res: Response): Promise<void> => {
+    devWarm = async (req: Request, res: Response): Promise<void> => {
         const telemetry = req.app.locals.telemetry as OpenTelemetryObserver;
         const operation = res.locals.routeOperation as Operation;
         const sitemapUrl = typeof req.body?.sitemapUrl === 'string'

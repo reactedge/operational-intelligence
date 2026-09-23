@@ -59,10 +59,15 @@ priority.
 The planning trace contains `sitemap_planner.request`, `sitemap_planner.plan`,
 `sitemap_planner.fetch_sitemap`, and `sitemap_planner.transform` spans.
 
-## Select and warm URLs
+## Development plan-and-warm entry point
 
-`POST /sitemap-planner/warm` builds the tagged plan internally, selects at
+`POST /sitemap-planner/dev-warm` builds the tagged plan internally, selects at
 most ten matching URLs, and delegates that bounded batch to cache-warmer.
+The `dev` name is deliberate: this synchronous endpoint exists to validate the
+integration. It refetches and replans on every call, holds the request open,
+and persists nothing. A production worker must consume a persisted plan and
+call cache-warmer directly.
+
 Selection is supplied with each request rather than hard-coded in the service.
 
 The `targetResponseTimeMs` value is a target used for selection. The cache
@@ -89,7 +94,7 @@ curl --fail --request POST \
       "limit": 2
     }
   }' \
-  http://localhost:8082/sitemap-planner/warm
+  http://localhost:8082/sitemap-planner/dev-warm
 ```
 
 ### High-priority batch
@@ -108,7 +113,7 @@ curl --fail --request POST \
       "limit": 5
     }
   }' \
-  http://localhost:8082/sitemap-planner/warm
+  http://localhost:8082/sitemap-planner/dev-warm
 ```
 
 ### Broad warm-up batch
@@ -127,7 +132,7 @@ curl --fail --request POST \
       "limit": 10
     }
   }' \
-  http://localhost:8082/sitemap-planner/warm
+  http://localhost:8082/sitemap-planner/dev-warm
 ```
 
 Matching URLs are sorted by descending priority and then by URL so repeated
@@ -148,10 +153,10 @@ Configuration:
 1. `GET /sitemap-planner/status` returns `{"status":"ok"}`.
 2. `POST /sitemap-planner/plan` returns the fetched sitemap URL, a count, and
    planned entries without calling cache-warmer.
-3. `POST /sitemap-planner/warm` returns only the selected entries and a
+3. `POST /sitemap-planner/dev-warm` returns only the selected entries and a
    `cacheWarmer` result.
 4. Jaeger lists `reactedge-sitemap-planner` and shows fetch, transform, select,
-   and delegation child spans for the `/warm` request.
+   and delegation child spans for the `/dev-warm` request.
 
 During diagnosis, use `curl -i` instead of `curl --fail`; otherwise curl hides
 the JSON body that explains an HTTP error.
