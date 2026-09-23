@@ -6,80 +6,48 @@ The service is intended to run alongside the platform it observes and provides r
 
 ---
 
-## Install
+## Run with Docker Compose
 
 ```bash
-mkdir platform-signals
 cd platform-signals
-
-python3 -m venv venv
-source venv/bin/activate
-
-pip install fastapi uvicorn
-pip install pydantic-settings
-pip install python-dotenv
-pip install redis
-pip install psutil
-pip install pytest
+cp .env.sample .env
+docker compose up --build --force-recreate
 ```
 
-Start the service:
+The Compose file connects to the existing `mageos_network` Docker network. If
+that network does not exist, start the local Magento stack first or create the
+network explicitly.
+
+Verify the service:
 
 ```bash
-uvicorn app.main:app --reload
+curl --fail http://127.0.0.1:8000/status
 ```
 
-Open:
-
-```
-http://127.0.0.1:8000/docs
-```
-
----
-
-## Run Platform Signals API
-
-```bash
-curl http://127.0.0.1:8000/status
-```
-
-Current response:
+The response contains platform identity and all signals consumed by
+cache-warmer:
 
 ```json
 {
-  "cpu": {
-    "status": "ok"
+  "timestamp": "2026-09-23T12:00:00Z",
+  "platform": {
+    "hostname": "localhost",
+    "environment": "development",
+    "service": "platform-signals",
+    "version": "0.1.0"
   },
-  "memory": {
-    "status": "ok"
-  },
-  "disk": {
-    "status": "ok"
+  "signals": {
+    "cpu": {"usagePercent": 10},
+    "memory": {"usagePercent": 50},
+    "disk": {"usagePercent": 60},
+    "redis": {"connected": true},
+    "varnish": {"connected": true}
   }
 }
 ```
 
----
-
-## Docker
-
-Build:
-
-```bash
-docker build \
-  -t platform-signals \
-  -f docker/Dockerfile \
-  .
-```
-
-Run:
-
-```bash
-docker run \
-  -p 8000:8000 \
-  -v $(pwd):/app \
-  platform-signals
-```
+Disconnected Redis or Varnish is still a valid observation. Cache-warmer uses
+it as a reason to stop before processing the next URL.
 
 ---
 
@@ -101,41 +69,16 @@ docker run -it \
 
 ---
 
-## Roadmap
+## Responsibility
 
-Initial platform signals:
+Platform Signals reports observations only:
 
 - CPU usage
 - Memory usage
 - Disk usage
-
-Future signals:
-
 - Redis
 - Varnish
-- Docker
-- Network
-- Filesystem
-- TLS certificates
-- Kubernetes
-- Process monitoring
 
----
-
-## Architecture
-
-```text
-Linux / Docker / Redis / Varnish
-               │
-               ▼
-      Platform Signals
-               │
-         REST API (/status)
-               │
-               ▼
-        ReactEdge Health Engine
-```
-
-Platform Signals is responsible only for exposing platform signals.
-
-The Health Engine consumes those signals to perform health assessment, diagnosis and remediation.
+It does not classify the platform as healthy and does not perform remediation.
+The cache-warmer safety policy consumes these observations and decides whether
+another URL may be requested.

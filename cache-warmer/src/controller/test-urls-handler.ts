@@ -2,7 +2,6 @@ import {Request, Response} from "express";
 import {config} from "../config";
 import {validateTargetUrl} from "../lib/url";
 import {BatchLoader} from "../model/performance/batch-loader";
-import {PerformanceEntry} from "../model/performance/types";
 import {UrlLoader} from "../model/performance/url-loader";
 import {PlatformSafetyPolicy} from "../model/platform/platform-safety-policy";
 import {PlatformSignalsClient} from "../model/platform/platform-signals-client";
@@ -10,6 +9,8 @@ import {OpenTelemetryObserver} from "../observability/activity";
 import {Operation} from "../observability/operation";
 
 export class TestUrlsHandler {
+    private static readonly MAX_BATCH_SIZE = 10;
+
     constructor(
         private readonly batchLoader = new BatchLoader(new UrlLoader()),
         private readonly platformSignals = new PlatformSignalsClient(
@@ -43,24 +44,29 @@ export class TestUrlsHandler {
         }
 
         try {
-            const firstResult = await this.warmUrl(
-                urls[0],
-                1,
+            const run = await this.batchLoader.measure(
+                urls.map((url, index) => ({
+                    id: `url-${index + 1}`,
+                    label: `URL ${index + 1}`,
+                    url
+                })),
                 telemetry,
                 operation
             );
+            const results = run.getEntries();
             const platformStatus = await this.platformSignals.getStatus(
                 telemetry,
                 operation
             );
             const decision = this.safetyPolicy.evaluate(
-                firstResult,
+                results,
                 platformStatus
             );
             const gateOperation = telemetry.startChildOperation(
                 operation,
-                'cache_warmer.second_url_gate',
+                'cache_warmer.next_batch_gate',
                 {
+                    'cache_warmer.batch.url_count': results.length,
                     'cache_warmer.gate.allowed': decision.allowed,
                     'cache_warmer.gate.reason_count': decision.reasons.length
                 }
@@ -71,30 +77,15 @@ export class TestUrlsHandler {
             );
             gateOperation.succeed();
 
-            if (!decision.allowed) {
-                operation.setAttribute('cache_warmer.outcome', 'stopped');
-                operation.succeed();
-                res.json({
-                    status: 'stopped',
-                    results: [firstResult],
-                    gate: decision,
-                    platform: platformStatus
-                });
-                return;
-            }
-
-            const secondResult = await this.warmUrl(
-                urls[1],
-                2,
-                telemetry,
-                operation
-            );
-
             operation.setAttribute('cache_warmer.outcome', 'completed');
+            operation.setAttribute(
+                'cache_warmer.next_batch.allowed',
+                decision.allowed
+            );
             operation.succeed();
             res.json({
                 status: 'completed',
-                results: [firstResult, secondResult],
+                results,
                 gate: decision,
                 platform: platformStatus
             });
@@ -109,8 +100,14 @@ export class TestUrlsHandler {
     }
 
     private validateUrls(value: unknown): string[] {
-        if (!Array.isArray(value) || value.length !== 2) {
-            throw new Error('Exactly two URLs are required.');
+        if (
+            !Array.isArray(value)
+            || value.length < 1
+            || value.length > TestUrlsHandler.MAX_BATCH_SIZE
+        ) {
+            throw new Error(
+                `Batch size must be between 1 and ${TestUrlsHandler.MAX_BATCH_SIZE} URLs.`
+            );
         }
 
         return value.map(url => {
@@ -125,24 +122,4 @@ export class TestUrlsHandler {
         });
     }
 
-    private async warmUrl(
-        url: string,
-        position: number,
-        telemetry: OpenTelemetryObserver,
-        parentOperation: Operation
-    ): Promise<PerformanceEntry> {
-        const id = `url-${position}`;
-        const run = await this.batchLoader.measure(
-            [{id, label: `URL ${position}`, url}],
-            telemetry,
-            parentOperation
-        );
-        const result = run.get(id);
-
-        if (!result) {
-            throw new Error(`No result was produced for URL ${position}.`);
-        }
-
-        return result;
-    }
 }
