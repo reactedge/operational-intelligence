@@ -16,11 +16,21 @@ export class PlatformSafetyPolicy {
         firstResult: PerformanceEntry,
         status: PlatformSignals
     ): PlatformGateDecision {
-        const reasons: string[] = [];
+        const decision = this.evaluateSignals(status);
+        const reasons = [...decision.reasons];
 
         if (!firstResult.healthy) {
-            reasons.push('The first URL did not return a successful response.');
+            reasons.unshift('The first URL did not return a successful response.');
         }
+
+        return {
+            allowed: reasons.length === 0,
+            reasons
+        };
+    }
+
+    evaluateSignals(status: PlatformSignals): PlatformGateDecision {
+        const reasons: string[] = [];
 
         this.rejectAboveThreshold(
             reasons,
