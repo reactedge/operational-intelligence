@@ -28,6 +28,7 @@ export interface SitemapEntry {
     id: string;
     url: string;
     label: string;
+    priority?: number;
 }
 
 export interface FetchResult {
