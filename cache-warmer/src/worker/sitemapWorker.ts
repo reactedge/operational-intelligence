@@ -12,6 +12,7 @@ export type SitemapWorkerOptions = {
     capacity: JourneyCapacityPolicy;
     telemetry: JourneyTelemetry;
     cycleIntervalMs: number;
+    allowedHosts?: string[];
     signal?: AbortSignal;
     sleep?: (ms: number) => Promise<void>;
     runJourney?: typeof runSitemapWarmJourney;
@@ -41,6 +42,7 @@ export async function runSitemapWorker(
                 minimumPriority: options.minimumPriority,
                 batchSize: options.batchSize,
                 startOffset,
+                allowedHosts: options.allowedHosts,
                 capacity: options.capacity,
                 telemetry: options.telemetry,
             });
