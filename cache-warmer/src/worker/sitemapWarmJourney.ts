@@ -1,6 +1,7 @@
 import { SitemapReader } from "../model/performance/sitemap-reader";
 import { UrlLoader } from "../model/performance/url-loader";
 import type { SitemapEntry } from "../model/performance/types";
+import { validateTargetUrl } from "../lib/url";
 
 export interface JourneyTelemetry {
     observe(name: string, attributes?: Record<string, string | number | boolean>): void | Promise<void>;
@@ -19,6 +20,7 @@ export type SitemapWarmJourneyOptions = {
     minimumPriority: number;
     batchSize: number;
     startOffset?: number;
+    allowedHosts?: string[];
     sitemapReader?: SitemapReader;
     urlLoader?: UrlLoader;
     capacity?: JourneyCapacityPolicy;
@@ -57,12 +59,15 @@ export async function runSitemapWarmJourney(
     const sitemapReader = options.sitemapReader ?? new SitemapReader();
     const urlLoader = options.urlLoader ?? new UrlLoader();
     const capacity = options.capacity ?? alwaysAvailableCapacity;
+    const sitemapUrl = options.allowedHosts
+        ? validateTargetUrl(options.sitemapUrl, options.allowedHosts)
+        : options.sitemapUrl;
 
     await options.telemetry.observe("cache_warmer.sitemap_fetch.started", {
-        "url.full": options.sitemapUrl,
+        "url.full": sitemapUrl,
     });
 
-    const entries = await sitemapReader.read(options.sitemapUrl);
+    const entries = await sitemapReader.read(sitemapUrl);
 
     await options.telemetry.observe("cache_warmer.sitemap_fetch.completed", {
         "cache_warmer.url.discovered": entries.length,
@@ -70,6 +75,9 @@ export async function runSitemapWarmJourney(
 
     const selectedEntries = entries
         .filter(entry => (entry.priority ?? 0) >= options.minimumPriority)
+        .map(entry => options.allowedHosts
+            ? { ...entry, url: validateTargetUrl(entry.url, options.allowedHosts) }
+            : entry)
         .sort((left, right) => {
             const priorityDifference = (right.priority ?? 0) - (left.priority ?? 0);
             return priorityDifference !== 0
