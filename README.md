@@ -7,7 +7,9 @@ OpenTelemetry.
 
 ## What the system currently does
 
-The implemented journey is synchronous:
+The system has two runnable journeys.
+
+The synchronous development journey is:
 
 1. `sitemap-planner` downloads a sitemap URL set.
 2. It transforms each sitemap entry into a planning record with cache, latency,
@@ -21,12 +23,19 @@ The implemented journey is synchronous:
    memory, disk, Redis, and Varnish signals.
 7. It returns a gate decision indicating whether another batch may start.
 
-There is no background worker or persistent job queue in this version. The
-caller waits for the complete selection and warming journey to finish.
+The cache-warmer also has a continuous background worker. When enabled, it
+fetches a configured sitemap, filters and orders its URLs, checks Platform
+Signals before every batch, warms each allowed batch, and retains an in-memory
+offset when capacity causes the journey to be deferred. After completing the
+selected URLs, it waits for the configured cycle interval and starts again.
+
+The worker does not yet have a persistent job queue or durable checkpoints. A
+process restart loses its current offset, and a deferred journey refetches the
+sitemap before resuming from that in-memory offset.
 
 See [the end-to-end flow](docs/end-to-end-flow.md) for the runnable development
-journey, the deliverable to inspect after every step, and the durable worker
-flow that remains to be implemented.
+endpoint, the continuous worker, the deliverable to inspect after every step,
+and the durability work that remains.
 
 ```mermaid
 flowchart TD
@@ -248,7 +257,10 @@ propagation is not yet implemented, so correlate them by time and URL.
 - this endpoint currently sends one batch per synchronous request;
 - 10 URLs is the current explicit maximum batch size, inherited from the
   initial safety requirement rather than a technical HTTP limitation;
-- jobs are not queued, persisted, retried, or resumed;
+- the worker retains its offset only in memory; jobs and URL outcomes are not
+  durably queued or persisted;
+- after a process restart the worker begins a new cycle, and after a capacity
+  deferral it refetches the sitemap before applying the retained offset;
 - cache verification is not yet a separate pass;
 - dependency failures are currently returned as `502` with limited diagnostic
   detail.

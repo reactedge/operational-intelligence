@@ -1,8 +1,9 @@
 # End-to-end cache-warming flow
 
-This document separates the development journey that can be run today from
-the durable worker journey that is still to be implemented. Each step names a
-deliverable that can be inspected before proceeding.
+This document separates the synchronous development endpoint, the continuous
+worker that can be run today, and the durable worker model that remains to be
+implemented. Each step names a deliverable that can be inspected before
+proceeding.
 
 ## Development journey available now
 
@@ -61,11 +62,34 @@ The endpoint name deliberately contains `dev`: it refetches and replans the
 sitemap on every call, processes only one batch, holds the HTTP request open,
 and persists nothing.
 
-## Durable worker journey to implement
+## Continuous worker available now
 
-The worker must create one plan snapshot and consume it in batches. It must not
-refetch and replan the sitemap for every batch because doing so can duplicate,
-omit, or reorder work when the sitemap changes.
+Set `CACHE_WARMER_WORKER_ENABLED=true` and configure the sitemap, priority,
+batch-size, cycle-interval, and retry-delay variables documented in
+`cache-warmer/README.md`. Starting cache-warmer then launches the worker with
+the HTTP server.
+
+| Step | Worker action | Checkable deliverable |
+| --- | --- | --- |
+| 1. Start | Read the configured sitemap and worker settings. | `cache_warmer.worker.started` telemetry with batch size and minimum priority. |
+| 2. Plan | Fetch the sitemap, validate allowed hosts, filter by priority, and order deterministically. | Sitemap-fetch and sitemap-selection observations with discovered and selected counts. |
+| 3. Check capacity | Read Platform Signals before each batch. | `cache_warmer.capacity.checked` with the decision and next offset. |
+| 4. Warm | Fetch every URL in the allowed batch sequentially. | Load observations and measured status/duration for each URL. |
+| 5. Defer | When capacity is unavailable, retain the next offset in memory and wait for the retry delay. | Worker and journey deferred observations containing offset, delay, and reason. |
+| 6. Resume | Refetch and reselect the sitemap, then continue from the retained offset. | No already-completed offset is processed again while the process and ordered selection remain stable. |
+| 7. Complete | Reset the offset after all selected URLs have been processed. | `cache_warmer.worker.cycle.completed` with discovered, selected, and warmed totals. |
+| 8. Repeat | Wait for the cycle interval and start a new sitemap cycle. | A new sitemap-fetch observation after the configured interval. |
+
+This is an operational worker, but not yet a durable job system. Its offset is
+process memory rather than persisted state. A restart begins again, and a
+sitemap change between deferral and resumption can change what a numeric offset
+means.
+
+## Durable worker journey still to implement
+
+A future durable worker must create one plan snapshot and consume it in
+batches. It must not refetch and replan the sitemap for every batch because
+doing so can duplicate, omit, or reorder work when the sitemap changes.
 
 | Step | Worker action | Persistent/checkable deliverable |
 | --- | --- | --- |
@@ -126,8 +150,8 @@ The persistence boundary is essential: a batch is not complete until its URL
 results and job progress have been stored. Queue acknowledgement must happen
 after that checkpoint so a worker crash can be retried safely.
 
-## Role of the development endpoint after the worker exists
+## Role of the development endpoint
 
 `POST /sitemap-planner/dev-warm` can remain as a small integration diagnostic.
-The worker must not call it. The worker should load its persisted plan, claim a
-batch, and call cache-warmer directly.
+The current cache-warmer worker does not call it. A future durable worker should
+load its persisted plan, claim a batch, and call cache-warmer directly.
