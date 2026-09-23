@@ -14,6 +14,14 @@ export type configInfo = {
     },
     cacheWarmer: {
         allowedHosts: string[];
+        worker: {
+            enabled: boolean;
+            sitemapUrl: string;
+            minimumPriority: number;
+            batchSize: number;
+            cycleIntervalMs: number;
+            deferRetryMs: number;
+        };
     },
     platformSignals: {
         statusUrl: string;
@@ -53,7 +61,16 @@ export const config: configInfo = {
         )
             .split(',')
             .map(host => host.trim())
-            .filter(Boolean)
+            .filter(Boolean),
+        worker: {
+            enabled: (process.env.CACHE_WARMER_WORKER_ENABLED ?? 'false') === 'true',
+            sitemapUrl: process.env.CACHE_WARMER_SITEMAP_URL
+                ?? 'https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml',
+            minimumPriority: Number(process.env.CACHE_WARMER_MINIMUM_PRIORITY ?? 0.5),
+            batchSize: Number(process.env.CACHE_WARMER_BATCH_SIZE ?? 5),
+            cycleIntervalMs: Number(process.env.CACHE_WARMER_CYCLE_INTERVAL_MS ?? 300000),
+            deferRetryMs: Number(process.env.CACHE_WARMER_DEFER_RETRY_MS ?? 30000),
+        }
     },
     platformSignals: {
         statusUrl: process.env.PLATFORM_SIGNALS_STATUS_URL
