@@ -1,5 +1,12 @@
 import {PlannedUrl, SitemapSourceEntry} from './types';
 
+const INITIAL_URL_POLICY = {
+    mustBeCached: true as const,
+    targetResponseTimeMs: 200 as const
+};
+const MIN_SITEMAP_PRIORITY = 0;
+const MAX_SITEMAP_PRIORITY = 1;
+
 export class SitemapPlanner {
     plan(entry: SitemapSourceEntry): PlannedUrl {
         const priority = entry.sitemapPriority === undefined
@@ -8,8 +15,7 @@ export class SitemapPlanner {
 
         return {
             url: entry.url,
-            mustBeCached: true,
-            targetResponseTimeMs: 200,
+            ...INITIAL_URL_POLICY,
             priority,
             tags: [
                 'must_be_cached',
@@ -21,7 +27,10 @@ export class SitemapPlanner {
     }
 
     private priorityFromSitemap(value: number): number {
-        const bounded = Math.max(0, Math.min(1, value));
+        const bounded = Math.max(
+            MIN_SITEMAP_PRIORITY,
+            Math.min(MAX_SITEMAP_PRIORITY, value)
+        );
         return Math.round(bounded * 4) + 1;
     }
 

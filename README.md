@@ -237,8 +237,10 @@ propagation is not yet implemented, so correlate them by time and URL.
 
 - only sitemap URL sets are supported; sitemap indexes are not expanded;
 - planning metadata currently marks every parsed URL as `must_be_cached` with a
-  `200 ms` target;
-- priority comes from sitemap `<priority>` or, when absent, URL path depth;
+  `200 ms` target; this is an initial uniform policy to validate the pipeline,
+  not the final URL-classification model;
+- sitemap `<priority>` is expected in the protocol range `0.0–1.0` and mapped
+  to internal priority `1–5`; when absent, priority comes from URL path depth;
 - this endpoint currently sends one batch per synchronous request;
 - 10 URLs is the current explicit maximum batch size, inherited from the
   initial safety requirement rather than a technical HTTP limitation;

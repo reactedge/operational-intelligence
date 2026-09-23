@@ -42,6 +42,21 @@ test('falls back to path depth when sitemap priority is absent', () => {
     );
 });
 
+test('clamps sitemap priority to its 0 to 1 protocol range', () => {
+    const planner = new SitemapPlanner();
+
+    assert.equal(
+        planner.plan({url: 'https://example.com/low', sitemapPriority: -1})
+            .priority,
+        1
+    );
+    assert.equal(
+        planner.plan({url: 'https://example.com/high', sitemapPriority: 2})
+            .priority,
+        5
+    );
+});
+
 test('selects a deterministic priority-ordered batch from configuration', () => {
     const planner = new SitemapPlanner();
     const entries = [

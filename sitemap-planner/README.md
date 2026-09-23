@@ -39,15 +39,22 @@ curl --fail --request POST \
   http://localhost:8082/sitemap-planner/plan
 ```
 
-Every URL receives:
+In this first iteration, every URL receives the same baseline cache policy:
 
 - `mustBeCached: true`;
 - `targetResponseTimeMs: 200`;
 - a priority from 1 to 5;
 - tags expressing the cache, response-time and priority requirements.
 
-When the sitemap provides `<priority>`, it is mapped from `0..1` to `1..5`.
-Otherwise shallower paths receive a higher priority.
+This does not yet classify which URLs truly require caching. A later policy
+layer is expected to derive `mustBeCached` and the response-time target from
+URL/store rules. The current uniform policy lets selection, batching,
+delegation, and observability be validated first.
+
+The sitemap protocol defines `<priority>` from `0.0` to `1.0`; it is mapped to
+the internal integer range `1..5`. Values outside the protocol range are
+clamped defensively. When priority is absent, shallower paths receive a higher
+priority.
 
 The planning trace contains `sitemap_planner.request`, `sitemap_planner.plan`,
 `sitemap_planner.fetch_sitemap`, and `sitemap_planner.transform` spans.
