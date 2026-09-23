@@ -84,7 +84,7 @@ Requirements: Node.js 20 or later, npm, and Docker.
 
    If the response mentions Nginx, Magento, or a redirect, the request reached another service rather than the cache-warmer. Confirm that the URL uses port `8081`.
 
-7. Open [Jaeger](http://localhost:16686), select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. The request trace must contain:
+7. Open Jaeger at `http://localhost:16686`, select `reactedge-cache-warmer` in the **Service** list, and click **Find Traces**. The request trace must contain:
 
    - parent span `cache_warmer.request`, with the request method, path, and response status;
    - child span `cache_warmer.test_urls` for the sequential operation;
@@ -99,6 +99,42 @@ When the first result or platform signals breach policy, the response uses
 `status: "stopped"`, contains only the first result, and explains the decision
 in `gate.reasons`. This is a completed safety decision, not an HTTP failure.
 
+## Continuous sitemap worker
+
+The worker is disabled by default. To enable it for development, set:
+
+```bash
+CACHE_WARMER_WORKER_ENABLED=true
+CACHE_WARMER_SITEMAP_URL=https://mageos-docker.magsite.co.uk/media/sitemap/uk.xml
+CACHE_WARMER_MINIMUM_PRIORITY=0.5
+CACHE_WARMER_BATCH_SIZE=5
+```
+
+The development sitemap above is preferred for worker testing. The public demo sitemap is `https://mageosuk.reactedge.net/sitemap.xml`, but worker development should not depend on the live demo site.
+
+When enabled, the worker:
+
+```text
+fetch sitemap
+→ select URLs by priority
+→ check platform capacity
+→ warm one batch
+→ check capacity again
+→ continue or defer
+```
+
+If the platform is saturated, the worker records the next offset, waits for `CACHE_WARMER_DEFER_RETRY_MS`, then resumes from the remaining selected URLs. After a complete cycle it waits for `CACHE_WARMER_CYCLE_INTERVAL_MS` before starting a new sitemap cycle.
+
+Worker activity is emitted through OpenTelemetry, including `cache_warmer.worker.started`, `cache_warmer.capacity.checked`, `cache_warmer.worker.deferred`, `cache_warmer.worker.cycle.completed`, and per-URL warming observations.
+
+Run the deterministic unit and end-to-end validation before enabling the worker:
+
+```bash
+npm test
+```
+
+The end-to-end test uses a local 40-URL sitemap fixture and real local HTTP requests, so it does not require Magento, Jaeger, or the live development sitemap.
+
 Stop Jaeger when finished:
 
 ```bash
@@ -109,11 +145,17 @@ docker stop reactedge-jaeger
 
 - `PORT`: server port; defaults to `8081`.
 - `FRONTEND_URL`: comma-separated browser origins allowed by CORS; defaults to `http://localhost:3001`.
-- `CACHE_WARMER_ALLOWED_HOSTS`: comma-separated hostnames the server may fetch; defaults to `mageosuk.reactedge.net`.
+- `CACHE_WARMER_ALLOWED_HOSTS`: comma-separated hostnames the server may fetch.
+- `CACHE_WARMER_WORKER_ENABLED`: enables the continuous sitemap worker; defaults to `false`.
+- `CACHE_WARMER_SITEMAP_URL`: sitemap used by the worker; defaults to the MageOS development sitemap.
+- `CACHE_WARMER_MINIMUM_PRIORITY`: minimum sitemap priority selected for warming; defaults to `0.5`.
+- `CACHE_WARMER_BATCH_SIZE`: selected URLs warmed before the next capacity check; defaults to `5`.
+- `CACHE_WARMER_CYCLE_INTERVAL_MS`: delay after a completed sitemap cycle; defaults to `300000`.
+- `CACHE_WARMER_DEFER_RETRY_MS`: delay before retrying deferred work; defaults to `30000`.
 - `PLATFORM_SIGNALS_STATUS_URL`: Platform Signals status endpoint; defaults to `http://127.0.0.1:8000/status`.
 - `PLATFORM_SIGNALS_TIMEOUT_MS`: status request timeout; defaults to `5000`.
-- `PLATFORM_MAX_CPU_PERCENT`: maximum CPU usage before stopping; defaults to `85`.
-- `PLATFORM_MAX_MEMORY_PERCENT`: maximum memory usage before stopping; defaults to `85`.
-- `PLATFORM_MAX_DISK_PERCENT`: maximum disk usage before stopping; defaults to `90`.
+- `PLATFORM_MAX_CPU_PERCENT`: maximum CPU usage before deferring; defaults to `85`.
+- `PLATFORM_MAX_MEMORY_PERCENT`: maximum memory usage before deferring; defaults to `85`.
+- `PLATFORM_MAX_DISK_PERCENT`: maximum disk usage before deferring; defaults to `90`.
 - `OTEL_HOST`: OpenTelemetry collector address; defaults to `http://localhost:4318`.
 - `OTEL_CACHE_WARMER_SERVICE`: telemetry service name; defaults to `reactedge-cache-warmer`.
