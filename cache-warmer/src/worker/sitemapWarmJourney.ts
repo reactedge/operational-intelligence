@@ -6,20 +6,40 @@ export interface JourneyTelemetry {
     observe(name: string, attributes?: Record<string, string | number | boolean>): void | Promise<void>;
 }
 
+export type JourneyCapacityDecision =
+    | { available: true }
+    | { available: false; retryAfterMs: number; reason?: string };
+
+export interface JourneyCapacityPolicy {
+    evaluate(): Promise<JourneyCapacityDecision>;
+}
+
 export type SitemapWarmJourneyOptions = {
     sitemapUrl: string;
     minimumPriority: number;
     batchSize: number;
+    startOffset?: number;
     sitemapReader?: SitemapReader;
     urlLoader?: UrlLoader;
+    capacity?: JourneyCapacityPolicy;
     telemetry: JourneyTelemetry;
 };
 
 export type SitemapWarmJourneyResult = {
+    state: "completed" | "deferred";
     discovered: number;
     selected: number;
     warmed: number;
     selectedEntries: SitemapEntry[];
+    nextOffset: number;
+    retryAfterMs?: number;
+    reason?: string;
+};
+
+const alwaysAvailableCapacity: JourneyCapacityPolicy = {
+    async evaluate(): Promise<JourneyCapacityDecision> {
+        return { available: true };
+    },
 };
 
 export async function runSitemapWarmJourney(
@@ -29,8 +49,14 @@ export async function runSitemapWarmJourney(
         throw new Error("batchSize must be a positive integer");
     }
 
+    const startOffset = options.startOffset ?? 0;
+    if (!Number.isInteger(startOffset) || startOffset < 0) {
+        throw new Error("startOffset must be a non-negative integer");
+    }
+
     const sitemapReader = options.sitemapReader ?? new SitemapReader();
     const urlLoader = options.urlLoader ?? new UrlLoader();
+    const capacity = options.capacity ?? alwaysAvailableCapacity;
 
     await options.telemetry.observe("cache_warmer.sitemap_fetch.started", {
         "url.full": options.sitemapUrl,
@@ -51,15 +77,51 @@ export async function runSitemapWarmJourney(
                 : left.url.localeCompare(right.url);
         });
 
+    if (startOffset > selectedEntries.length) {
+        throw new Error("startOffset cannot exceed selected URL count");
+    }
+
     await options.telemetry.observe("cache_warmer.sitemap_selection.completed", {
         "cache_warmer.url.discovered": entries.length,
         "cache_warmer.url.selected": selectedEntries.length,
         "cache_warmer.minimum_priority": options.minimumPriority,
+        "cache_warmer.start_offset": startOffset,
     });
 
     let warmed = 0;
 
-    for (let offset = 0; offset < selectedEntries.length; offset += options.batchSize) {
+    for (let offset = startOffset; offset < selectedEntries.length; offset += options.batchSize) {
+        const decision = await capacity.evaluate();
+
+        await options.telemetry.observe("cache_warmer.capacity.checked", {
+            "cache_warmer.capacity.available": decision.available,
+            "cache_warmer.next_offset": offset,
+            ...(!decision.available && decision.reason
+                ? { "cache_warmer.capacity.reason": decision.reason }
+                : {}),
+        });
+
+        if (!decision.available) {
+            await options.telemetry.observe("cache_warmer.journey.deferred", {
+                "cache_warmer.next_offset": offset,
+                "cache_warmer.retry_after_ms": decision.retryAfterMs,
+                ...(decision.reason
+                    ? { "cache_warmer.capacity.reason": decision.reason }
+                    : {}),
+            });
+
+            return {
+                state: "deferred",
+                discovered: entries.length,
+                selected: selectedEntries.length,
+                warmed,
+                selectedEntries,
+                nextOffset: offset,
+                retryAfterMs: decision.retryAfterMs,
+                reason: decision.reason,
+            };
+        }
+
         const batch = selectedEntries.slice(offset, offset + options.batchSize);
         const batchNumber = Math.floor(offset / options.batchSize) + 1;
 
@@ -96,9 +158,11 @@ export async function runSitemapWarmJourney(
     }
 
     return {
+        state: "completed",
         discovered: entries.length,
         selected: selectedEntries.length,
         warmed,
         selectedEntries,
+        nextOffset: selectedEntries.length,
     };
 }
