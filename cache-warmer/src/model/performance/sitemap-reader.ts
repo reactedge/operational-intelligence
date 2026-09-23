@@ -5,7 +5,6 @@ export class SitemapReader {
         let xml: string;
 
         try {
-
             const response = await fetch(siteMapUrl);
 
             if (!response.ok) {
@@ -15,62 +14,56 @@ export class SitemapReader {
             }
 
             xml = await response.text();
-
         } catch (e) {
-
             throw new Error(
-                `Failed to retrieve sitemap: ${e instanceof Error ? e.message : e
-                }`
+                `Failed to retrieve sitemap: ${e instanceof Error ? e.message : e}`
             );
         }
 
-        const matches =
-            [...xml.matchAll(/<loc>(.*?)<\/loc>/g)];
+        const entries = [...xml.matchAll(/<url>([\s\S]*?)<\/url>/g)]
+            .map(match => this.parseUrlBlock(match[1]))
+            .filter((entry): entry is SitemapEntry => entry !== null);
 
-        if (matches.length === 0) {
-            throw new Error(
-                'No URLs found in sitemap.'
-            );
+        if (entries.length === 0) {
+            throw new Error('No URLs found in sitemap.');
         }
 
-        return matches.map(match => {
-
-            const url = match[1];
-
-            return {
-                id: this.extractId(url),
-                url,
-                label: this.extractLabel(url)
-            };
-
-        });
+        return entries;
     }
 
-    private extractLabel(
-        url: string
-    ): string {
+    private parseUrlBlock(block: string): SitemapEntry | null {
+        const loc = block.match(/<loc>(.*?)<\/loc>/)?.[1]?.trim();
 
-        const pathname =
-            new URL(url).pathname;
+        if (!loc) {
+            return null;
+        }
 
-        const segments =
-            pathname
-                .split('/')
-                .filter(Boolean);
+        const priorityValue = block.match(/<priority>(.*?)<\/priority>/)?.[1]?.trim();
+        const priority = priorityValue === undefined
+            ? undefined
+            : Number(priorityValue);
+
+        return {
+            id: this.extractId(loc),
+            url: loc,
+            label: this.extractLabel(loc),
+            priority: Number.isFinite(priority) ? priority : undefined,
+        };
+    }
+
+    private extractLabel(url: string): string {
+        const pathname = new URL(url).pathname;
+        const segments = pathname.split('/').filter(Boolean);
 
         if (segments.length === 0) {
             return 'home';
         }
 
-        return segments
-            .at(-1)!
-            .replace('.html', '');
+        return segments.at(-1)!.replace('.html', '');
     }
 
     private extractId(url: string): string {
-
-        const pathname =
-            new URL(url).pathname;
+        const pathname = new URL(url).pathname;
 
         if (pathname === '/') {
             return 'home';

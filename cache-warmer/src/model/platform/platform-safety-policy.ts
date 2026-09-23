@@ -22,8 +22,16 @@ export class PlatformSafetyPolicy {
         if (failedUrls.length > 0) {
             reasons.push(
                 `${failedUrls.length} URL(s) in the completed batch did not return a successful response.`
-            );
-        }
+            );       
+
+        return {
+            allowed: reasons.length === 0,
+            reasons
+        };
+    }
+
+    evaluateSignals(status: PlatformSignals): PlatformGateDecision {
+        const reasons: string[] = [];
 
         this.rejectAboveThreshold(
             reasons,
