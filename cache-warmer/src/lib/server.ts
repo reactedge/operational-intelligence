@@ -48,6 +48,7 @@ export const startServer = async () => {
                 minimumPriority: config.cacheWarmer.worker.minimumPriority,
                 batchSize: config.cacheWarmer.worker.batchSize,
                 cycleIntervalMs: config.cacheWarmer.worker.cycleIntervalMs,
+                allowedHosts: config.cacheWarmer.allowedHosts,
                 capacity,
                 signal: abortController.signal,
                 telemetry: {
