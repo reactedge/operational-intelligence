@@ -3,12 +3,33 @@ import assert from "node:assert/strict";
 import http from "node:http";
 import { once } from "node:events";
 
-import { runSitemapWarmJourney } from "../src/worker/sitemapWarmJourney";
+import {
+    runSitemapWarmJourney,
+    type JourneyCapacityDecision,
+    type JourneyCapacityPolicy,
+} from "../src/worker/sitemapWarmJourney";
 
 type TelemetryEvent = {
     name: string;
     attributes: Record<string, string | number | boolean>;
 };
+
+class SequenceCapacityPolicy implements JourneyCapacityPolicy {
+    private index = 0;
+
+    constructor(
+        private readonly decisions: JourneyCapacityDecision[],
+    ) {}
+
+    async evaluate(): Promise<JourneyCapacityDecision> {
+        const decision = this.decisions[this.index]
+            ?? this.decisions.at(-1)
+            ?? { available: true };
+
+        this.index += 1;
+        return decision;
+    }
+}
 
 function buildSitemap(baseUrl: string): string {
     const urls = Array.from({ length: 40 }, (_, index) => {
@@ -31,7 +52,7 @@ function buildSitemap(baseUrl: string): string {
     ].join("\n");
 }
 
-test("end to end: fetch sitemap, select priority URLs, warm them in batches and emit telemetry", async (t) => {
+async function startFixtureServer() {
     const requestedPaths: string[] = [];
     let sitemapXml = "";
 
@@ -61,21 +82,31 @@ test("end to end: fetch sitemap, select priority URLs, warm them in batches and 
     server.listen(0, "127.0.0.1");
     await once(server, "listening");
 
-    t.after(async () => {
-        server.close();
-        await once(server, "close");
-    });
-
     const address = server.address();
     assert.ok(address && typeof address === "object");
 
     const baseUrl = `http://127.0.0.1:${address.port}`;
     sitemapXml = buildSitemap(baseUrl);
 
+    return {
+        server,
+        requestedPaths,
+        baseUrl,
+    };
+}
+
+test("end to end: fetch sitemap, select priority URLs, warm them in batches and emit telemetry", async (t) => {
+    const fixture = await startFixtureServer();
+
+    t.after(async () => {
+        fixture.server.close();
+        await once(fixture.server, "close");
+    });
+
     const telemetry: TelemetryEvent[] = [];
 
     const result = await runSitemapWarmJourney({
-        sitemapUrl: `${baseUrl}/sitemap.xml`,
+        sitemapUrl: `${fixture.baseUrl}/sitemap.xml`,
         minimumPriority: 0.5,
         batchSize: 5,
         telemetry: {
@@ -85,12 +116,14 @@ test("end to end: fetch sitemap, select priority URLs, warm them in batches and 
         },
     });
 
+    assert.equal(result.state, "completed");
     assert.equal(result.discovered, 40);
     assert.equal(result.selected, 24);
     assert.equal(result.warmed, 24);
+    assert.equal(result.nextOffset, 24);
 
-    const warmRequests = requestedPaths.filter(path => path !== "/sitemap.xml");
-    assert.equal(requestedPaths[0], "/sitemap.xml");
+    const warmRequests = fixture.requestedPaths.filter(path => path !== "/sitemap.xml");
+    assert.equal(fixture.requestedPaths[0], "/sitemap.xml");
     assert.equal(warmRequests.length, 24);
     assert.equal(new Set(warmRequests).size, 24);
 
@@ -116,7 +149,16 @@ test("end to end: fetch sitemap, select priority URLs, warm them in batches and 
         "cache_warmer.url.discovered": 40,
         "cache_warmer.url.selected": 24,
         "cache_warmer.minimum_priority": 0.5,
+        "cache_warmer.start_offset": 0,
     });
+
+    const capacityChecks = telemetry.filter(
+        event => event.name === "cache_warmer.capacity.checked",
+    );
+    assert.equal(capacityChecks.length, 5);
+    assert.ok(capacityChecks.every(
+        event => event.attributes["cache_warmer.capacity.available"] === true,
+    ));
 
     const batchStarted = telemetry.filter(
         event => event.name === "cache_warmer.batch.started",
@@ -146,4 +188,80 @@ test("end to end: fetch sitemap, select priority URLs, warm them in batches and 
     assert.ok(loadCompleted.every(
         event => event.attributes["http.response.status_code"] === 200,
     ));
+});
+
+test("end to end: defer on saturation and resume without repeating completed URLs", async (t) => {
+    const fixture = await startFixtureServer();
+
+    t.after(async () => {
+        fixture.server.close();
+        await once(fixture.server, "close");
+    });
+
+    const telemetry: TelemetryEvent[] = [];
+    const observe = (name: string, attributes: Record<string, string | number | boolean> = {}) => {
+        telemetry.push({ name, attributes });
+    };
+
+    const firstRun = await runSitemapWarmJourney({
+        sitemapUrl: `${fixture.baseUrl}/sitemap.xml`,
+        minimumPriority: 0.5,
+        batchSize: 5,
+        capacity: new SequenceCapacityPolicy([
+            { available: true },
+            { available: true },
+            { available: false, retryAfterMs: 30_000, reason: "cpu" },
+        ]),
+        telemetry: { observe },
+    });
+
+    assert.equal(firstRun.state, "deferred");
+    assert.equal(firstRun.warmed, 10);
+    assert.equal(firstRun.nextOffset, 10);
+    assert.equal(firstRun.retryAfterMs, 30_000);
+    assert.equal(firstRun.reason, "cpu");
+
+    const warmRequestsAfterFirstRun = fixture.requestedPaths.filter(
+        path => path !== "/sitemap.xml",
+    );
+    assert.equal(warmRequestsAfterFirstRun.length, 10);
+
+    const deferred = telemetry.find(
+        event => event.name === "cache_warmer.journey.deferred",
+    );
+    assert.deepEqual(deferred?.attributes, {
+        "cache_warmer.next_offset": 10,
+        "cache_warmer.retry_after_ms": 30_000,
+        "cache_warmer.capacity.reason": "cpu",
+    });
+
+    const secondRun = await runSitemapWarmJourney({
+        sitemapUrl: `${fixture.baseUrl}/sitemap.xml`,
+        minimumPriority: 0.5,
+        batchSize: 5,
+        startOffset: firstRun.nextOffset,
+        capacity: new SequenceCapacityPolicy([{ available: true }]),
+        telemetry: { observe },
+    });
+
+    assert.equal(secondRun.state, "completed");
+    assert.equal(secondRun.warmed, 14);
+    assert.equal(secondRun.nextOffset, 24);
+
+    const allWarmRequests = fixture.requestedPaths.filter(
+        path => path !== "/sitemap.xml",
+    );
+
+    assert.equal(allWarmRequests.length, 24);
+    assert.equal(new Set(allWarmRequests).size, 24);
+
+    const expectedPaths = secondRun.selectedEntries.map(
+        entry => new URL(entry.url).pathname,
+    );
+    assert.deepEqual(allWarmRequests, expectedPaths);
+
+    const sitemapRequests = fixture.requestedPaths.filter(
+        path => path === "/sitemap.xml",
+    );
+    assert.equal(sitemapRequests.length, 2);
 });
