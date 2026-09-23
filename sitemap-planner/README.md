@@ -64,7 +64,7 @@ an observed response time.
 
 Start Platform Signals on port `8000` and cache-warmer on port `8081`, then
 choose one of these configurations. The request remains open until
-cache-warmer completes or stops the selected batch.
+cache-warmer completes the selected batch and returns its next-batch gate.
 
 ### Critical pages
 
@@ -126,6 +126,9 @@ curl --fail --request POST \
 Matching URLs are sorted by descending priority and then by URL so repeated
 requests select the same batch. `matched` reports the number satisfying the
 configuration; `selected` reports the bounded batch sent to cache-warmer.
+`limit` is the requested batch size. The current implementation accepts 1–10;
+the upper bound comes from the initial cache-warming safety requirement and is
+not a transport limitation.
 
 Configuration:
 

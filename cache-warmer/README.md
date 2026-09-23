@@ -1,7 +1,7 @@
 # Cache warmer
 
-Sequential cache warmer that checks platform signals before progressing to the
-next URL.
+Sequential cache warmer that processes one bounded batch and then checks
+platform signals before another batch may start.
 
 ## Run and verify the happy path
 
@@ -55,7 +55,8 @@ Requirements: Node.js 20 or later, npm, and Docker.
 
    To debug instead, open the repository root in VS Code, select **Debug cache warmer**, add a breakpoint in `TestOneUrlHandler.testUrl`, and press F5.
 
-6. From another terminal, submit between one and ten URLs:
+6. From another terminal, submit a batch of between one and ten URLs. Ten is
+   the current explicit safety bound for a batch, not an HTTP limitation:
 
    ```bash
    curl -i --request POST \
@@ -89,16 +90,18 @@ Requirements: Node.js 20 or later, npm, and Docker.
    - parent span `cache_warmer.request`, with the request method, path, and response status;
    - child span `cache_warmer.test_urls` for the sequential operation;
    - `cache_warmer.load_url` for URL 1;
-   - `cache_warmer.platform_status` and `cache_warmer.next_url_gate` between
-     URLs;
-   - the next `cache_warmer.load_url` only when the preceding gate allows it.
+   - one `cache_warmer.platform_status` after all submitted URLs;
+   - one `cache_warmer.next_batch_gate` containing the decision for a future
+     batch.
 
    If the action fails, the child span has status `ERROR` and records the
    exception. The parent span then ends when the HTTP response completes.
 
-When the first result or platform signals breach policy, the response uses
-`status: "stopped"`, contains only the first result, and explains the decision
-in `gate.reasons`. This is a completed safety decision, not an HTTP failure.
+Every URL in the submitted batch is attempted before Platform Signals is read.
+The response uses `status: "completed"` and includes every result. When a URL
+failed or the post-batch signals breach policy, `gate.allowed` is false and
+`gate.reasons` explains why another batch must not start. This is a completed
+safety decision, not an HTTP failure.
 
 Stop Jaeger when finished:
 

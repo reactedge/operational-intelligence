@@ -13,13 +13,16 @@ export class PlatformSafetyPolicy {
     ) {}
 
     evaluate(
-        precedingResult: PerformanceEntry,
+        batchResults: PerformanceEntry[],
         status: PlatformSignals
     ): PlatformGateDecision {
         const reasons: string[] = [];
+        const failedUrls = batchResults.filter(result => !result.healthy);
 
-        if (!precedingResult.healthy) {
-            reasons.push('The preceding URL did not return a successful response.');
+        if (failedUrls.length > 0) {
+            reasons.push(
+                `${failedUrls.length} URL(s) in the completed batch did not return a successful response.`
+            );
         }
 
         this.rejectAboveThreshold(

@@ -14,11 +14,12 @@ The implemented journey is synchronous:
    priority, and tag metadata.
 3. It filters and ranks those records using configuration supplied in the
    request.
-4. It sends a bounded batch of 1–10 URLs to `cache-warmer`.
+4. It sends one configured batch to `cache-warmer`. The current safety bound is
+   10 URLs per batch.
 5. `cache-warmer` requests each URL sequentially.
-6. Between URLs, `cache-warmer` asks `platform-signals` for CPU, memory, disk,
-   Redis, and Varnish signals.
-7. The next URL is requested only when the safety policy allows it.
+6. After the complete batch, `cache-warmer` asks `platform-signals` for CPU,
+   memory, disk, Redis, and Varnish signals.
+7. It returns a gate decision indicating whether another batch may start.
 
 There is no background worker or persistent job queue in this version. The
 caller waits for the complete selection and warming journey to finish.
@@ -130,7 +131,7 @@ curl --fail http://127.0.0.1:8000/status
 
 The JSON response must contain `cpu`, `memory`, `disk`, `redis`, and `varnish`
 under `signals`. A disconnected Redis or Varnish service is a valid reported
-signal, but it will cause cache-warmer to stop before the next URL.
+  signal, but the post-batch gate will prevent another batch from starting.
 
 ### 3. Start cache-warmer
 
@@ -185,14 +186,10 @@ not hidden. A working response has HTTP `200`, `selected` between 1 and 2, an
 `entries` array containing only the selected planning records, and a
 `cacheWarmer` object containing measured results.
 
-The cache-warmer outcome has two valid states:
-
-- `completed`: every selected URL was requested;
-- `stopped`: at least one URL was requested, but page or platform signals
-  prevented the next request.
-
-`stopped` is a successful safety decision and therefore normally uses HTTP
-`200`; inspect `gate.reasons` or `gates` for the explanation.
+Cache-warmer processes every URL in the submitted batch, then returns
+`status: "completed"`. The separate `gate.allowed` value indicates whether a
+future batch may start. A false gate is a successful safety decision, not an
+HTTP failure; inspect `gate.reasons` for the explanation.
 
 ## Verify observability
 
@@ -218,8 +215,8 @@ The trace should contain:
 - `cache_warmer.request`;
 - `cache_warmer.test_urls`;
 - one `cache_warmer.load_url` per URL actually requested;
-- `cache_warmer.platform_status` between URLs;
-- `cache_warmer.next_url_gate` between URLs.
+- one `cache_warmer.platform_status` after the batch;
+- one `cache_warmer.next_batch_gate` after the batch.
 
 The two services currently export separate traces. Cross-service trace-context
 propagation is not yet implemented, so correlate them by time and URL.
@@ -232,7 +229,7 @@ propagation is not yet implemented, so correlate them by time and URL.
 | Planner says the sitemap host is not allowed | Host is absent from the planner allowlist | `SITEMAP_ALLOWED_HOSTS` in `sitemap-planner/.env` |
 | Planner says cache-warmer returned an HTTP error | Sitemap selection succeeded; delegation failed | Call `POST :8081/cache-warmer/test-urls` directly and inspect its body |
 | Cache-warmer rejects a target host | Host is absent from its independent allowlist | `CACHE_WARMER_ALLOWED_HOSTS` in `cache-warmer/.env` |
-| Cache-warmer returns `stopped` | The safety policy deliberately prevented another request | `gate.reasons`, Platform Signals response, and Jaeger spans |
+| Cache-warmer returns `gate.allowed: false` | The safety policy has prevented another batch | `gate.reasons`, Platform Signals response, and Jaeger spans |
 | Connection refused on `8081` or `8082` | The corresponding Node service is not running | `ss -ltnp` and the service terminal |
 | No traces appear | Collector is unavailable or the wrong service/time range is selected | Jaeger container, port `4318`, `OTEL_HOST`, service selector |
 
@@ -242,7 +239,9 @@ propagation is not yet implemented, so correlate them by time and URL.
 - planning metadata currently marks every parsed URL as `must_be_cached` with a
   `200 ms` target;
 - priority comes from sitemap `<priority>` or, when absent, URL path depth;
-- selection is capped at 10 URLs per synchronous request;
+- this endpoint currently sends one batch per synchronous request;
+- 10 URLs is the current explicit maximum batch size, inherited from the
+  initial safety requirement rather than a technical HTTP limitation;
 - jobs are not queued, persisted, retried, or resumed;
 - cache verification is not yet a separate pass;
 - dependency failures are currently returned as `502` with limited diagnostic

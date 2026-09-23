@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "NODE_EXTRA_CA_CERTS=/usr/local/share/ca-certificates/caddy-root.crt  tsx watch src/index.ts",
-    "start": "node --import tsx src/index.ts"
+    "start": "node --import tsx src/index.ts",
+    "test": "node --import tsx --test test/**/*.test.ts"
   },
   "dependencies": {
     "@opentelemetry/api": "^1.9.1",
