@@ -16,13 +16,15 @@ export class PlatformSafetyPolicy {
         batchResults: PerformanceEntry[],
         status: PlatformSignals
     ): PlatformGateDecision {
-        const reasons: string[] = [];
+        const decision = this.evaluateSignals(status);
+        const reasons = [...decision.reasons];
         const failedUrls = batchResults.filter(result => !result.healthy);
 
         if (failedUrls.length > 0) {
             reasons.push(
                 `${failedUrls.length} URL(s) in the completed batch did not return a successful response.`
-            );       
+            );
+        }
 
         return {
             allowed: reasons.length === 0,
