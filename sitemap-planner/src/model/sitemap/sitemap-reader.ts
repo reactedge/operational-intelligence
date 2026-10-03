@@ -1,5 +1,5 @@
 import {XMLParser} from 'fast-xml-parser';
-import {SitemapSourceEntry} from './types';
+import {SitemapSourceEntry} from './types.js';
 
 type ParsedUrl = {
     loc?: string;

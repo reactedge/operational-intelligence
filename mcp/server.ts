@@ -1,6 +1,7 @@
 import {McpServer} from '@modelcontextprotocol/server';
 import {serveStdio} from '@modelcontextprotocol/server/stdio';
 import {registerCreateServerTool} from './tools/createServer.js';
+import {registerPlanSitemapTool} from './tools/planSitemap.js';
 
 function createServer(): McpServer {
     const server = new McpServer({
@@ -9,6 +10,7 @@ function createServer(): McpServer {
     });
 
     registerCreateServerTool(server);
+    registerPlanSitemapTool(server);
 
     return server;
 }

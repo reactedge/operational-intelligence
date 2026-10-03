@@ -1,4 +1,4 @@
-import {PlannedUrl, SitemapSourceEntry} from './types';
+import {PlannedUrl, SitemapSourceEntry} from './types.js';
 
 const INITIAL_URL_POLICY = {
     mustBeCached: true as const,

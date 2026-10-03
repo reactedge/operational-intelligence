@@ -2,7 +2,7 @@ import {
     PlannedUrl,
     SitemapSelection,
     SitemapSelectionConfig
-} from './types';
+} from './types.js';
 
 const MAX_SELECTION_SIZE = 10;
 
