@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {McpServer} from '@modelcontextprotocol/server';
 import {SitemapClient} from '../../sitemap-planner/src/model/sitemap/sitemap-client.js';
-import {planSitemap, registerPlanSitemapTool} from '../tools/planSitemap.js';
+import {registerPlanSitemapTool} from '../tools/planSitemap.js';
+import {planSitemap} from '../operations/planSitemap.js';
 
 const selection = {
     requiredTags: ['must_be_cached'],

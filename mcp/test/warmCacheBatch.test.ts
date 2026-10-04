@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {McpServer} from '@modelcontextprotocol/server';
-import {warmCacheBatch, registerWarmCacheBatchTool} from '../tools/warmCacheBatch.js';
+import {registerWarmCacheBatchTool} from '../tools/warmCacheBatch.js';
+import {warmCacheBatch} from '../operations/warmCacheBatch.js';
 
 const input = {urls: ['https://example.com/']};
 const blocked = {

@@ -110,3 +110,12 @@ may already have loaded when an error occurs. Inspect service telemetry before
 retrying. A successful load does not itself prove a cache hit; inspect the cache
 fields returned for each URL. Standalone platform checks and agent orchestration
 remain separate work.
+
+## Tool structure
+
+Each capability has its own file in `tools/`, `handlers/` and `operations/`.
+`tools/` only registers metadata, the input schema and its handler. `handlers/`
+formats MCP responses and errors. `operations/` performs the work, reusing the
+existing service or domain implementation. Sitemap planning and cache warming
+are independently callable; neither invokes the other. Keep future steps in
+separate files using this same structure.
