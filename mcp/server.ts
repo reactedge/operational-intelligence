@@ -3,6 +3,8 @@ import {serveStdio} from '@modelcontextprotocol/server/stdio';
 import {registerCreateServerTool} from './tools/createServer.js';
 import {registerPlanSitemapTool} from './tools/planSitemap.js';
 
+import {registerWarmCacheBatchTool} from './tools/warmCacheBatch.js';
+
 function createServer(): McpServer {
     const server = new McpServer({
         name: 'reactedge-operational-intelligence',
@@ -11,6 +13,7 @@ function createServer(): McpServer {
 
     registerCreateServerTool(server);
     registerPlanSitemapTool(server);
+    registerWarmCacheBatchTool(server);
 
     return server;
 }

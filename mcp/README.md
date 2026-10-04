@@ -76,3 +76,37 @@ performance. Only sitemap URL sets are supported, not sitemap indexes.
 
 This tool reads the sitemap only: it does not request candidate pages, validate
 their health, check platform signals, or invoke cache-warmer.
+
+## Warm one cache batch
+
+`warm_cache_batch` delegates to the running cache-warmer service's existing
+`POST /cache-warmer/test-urls` route. Start that service and its platform-signals
+dependency with their normal configuration. The service owns URL/host validation,
+page loading, telemetry and the safety policy; MCP does not duplicate them.
+
+Optional MCP process environment:
+
+```bash
+CACHE_WARMER_TEST_URLS_URL=http://127.0.0.1:8081/cache-warmer/test-urls
+CACHE_WARMER_TIMEOUT_MS=120000
+```
+
+Inspector input (replace with an allowed store URL):
+
+```json
+{"urls":["https://mageosuk.reactedge.net/"]}
+```
+
+After `plan_sitemap`, pass selected `entries[].url` explicitly, in batches of
+1–10. Empty selections require no call. The result preserves `status`, `results`,
+`gate` and `platform` as structured content and JSON text. A completed batch can
+contain failed URLs: inspect `results` and stop when `gate.allowed` is false.
+The gate concerns the **next** batch and is evaluated **after** loading this one;
+it does not protect the first batch with a preflight check.
+
+This tool makes one request, without automatic retries, chunking or continuation.
+HTTP/dependency failures, timeouts and malformed replies become MCP errors; pages
+may already have loaded when an error occurs. Inspect service telemetry before
+retrying. A successful load does not itself prove a cache hit; inspect the cache
+fields returned for each URL. Standalone platform checks and agent orchestration
+remain separate work.
