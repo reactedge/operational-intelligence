@@ -282,3 +282,14 @@ To use the MCP Inspector from the repository root:
 ```bash
 npx @modelcontextprotocol/inspector npx tsx mcp/server.ts
 ```
+
+## Sitemap MCP capabilities
+
+The MCP server exposes two independent operations: `read_sitemap` retrieves all
+parsed source entries; `select_urls` plans and selects from supplied entries
+without network access. These replace the draft combined `plan_sitemap` tool.
+Callers compose them explicitly and own progress between batches. Neither tool
+warms pages or assesses platform capacity.
+
+See [MCP setup, examples and verification](mcp/README.md#independent-sitemap-operations)
+for their contracts, limitations and test commands.
