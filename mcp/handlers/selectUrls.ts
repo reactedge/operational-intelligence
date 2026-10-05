@@ -1,5 +1,5 @@
 import type {z} from 'zod';
-import {selectUrls, SelectUrlsInputSchema} from '../operations/selectUrls.js';
+import {selectUrls, SelectUrlsInputSchema} from '../operations/selectUrls';
 
 export async function handleSelectUrls(input: z.infer<typeof SelectUrlsInputSchema>) {
     try {

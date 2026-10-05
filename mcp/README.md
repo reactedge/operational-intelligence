@@ -125,3 +125,11 @@ contracts, and composing both operations while reading the sitemap only once.
 For manual verification in Inspector, call `read_sitemap`, copy its entries into
 `select_urls`, and inspect the counts and selected URLs. Automated tests use
 fixtures; they do not warm a live store.
+
+## TypeScript imports
+
+Like ReactEdge's MCP, this package uses `module: ESNext`,
+`moduleResolution: Bundler` and `noEmit: true`. Relative TypeScript imports
+omit file extensions. Run through the documented `tsx` commands; TypeScript
+checks types without producing JavaScript. Plain Node execution of emitted
+JavaScript would require a separate build and resolution setup.

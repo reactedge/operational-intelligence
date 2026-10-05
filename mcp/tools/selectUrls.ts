@@ -1,7 +1,7 @@
 import type {McpServer} from '@modelcontextprotocol/server';
-import {SelectUrlsInputSchema} from '../operations/selectUrls.js';
+import {SelectUrlsInputSchema} from '../operations/selectUrls';
 
-import {handleSelectUrls} from '../handlers/selectUrls.js';
+import {handleSelectUrls} from '../handlers/selectUrls';
 
 export function registerSelectUrlsTool(server: McpServer): void {
     server.registerTool(

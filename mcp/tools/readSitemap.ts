@@ -1,7 +1,7 @@
 import type {McpServer} from '@modelcontextprotocol/server';
-import {ReadSitemapInputSchema} from '../operations/readSitemap.js';
+import {ReadSitemapInputSchema} from '../operations/readSitemap';
 
-import {handleReadSitemap} from '../handlers/readSitemap.js';
+import {handleReadSitemap} from '../handlers/readSitemap';
 
 export function registerReadSitemapTool(server: McpServer): void {
     server.registerTool(

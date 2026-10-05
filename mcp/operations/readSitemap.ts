@@ -1,7 +1,7 @@
 import {z} from 'zod';
-import {config} from '../../sitemap-planner/src/config.js';
-import {SitemapClient} from '../../sitemap-planner/src/model/sitemap/sitemap-client.js';
-import {SitemapReader} from '../../sitemap-planner/src/model/sitemap/sitemap-reader.js';
+import {config} from '../../sitemap-planner/src/config';
+import {SitemapClient} from '../../sitemap-planner/src/model/sitemap/sitemap-client';
+import {SitemapReader} from '../../sitemap-planner/src/model/sitemap/sitemap-reader';
 
 export const ReadSitemapInputSchema = z.object({sitemapUrl: z.string()});
 

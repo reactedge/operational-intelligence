@@ -1,11 +1,11 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type {McpServer} from '@modelcontextprotocol/server';
-import {SitemapClient} from '../../sitemap-planner/src/model/sitemap/sitemap-client.js';
-import {readSitemap} from '../operations/readSitemap.js';
-import {selectUrls} from '../operations/selectUrls.js';
-import {registerReadSitemapTool} from '../tools/readSitemap.js';
-import {registerSelectUrlsTool} from '../tools/selectUrls.js';
+import {SitemapClient} from '../../sitemap-planner/src/model/sitemap/sitemap-client';
+import {readSitemap} from '../operations/readSitemap';
+import {selectUrls} from '../operations/selectUrls';
+import {registerReadSitemapTool} from '../tools/readSitemap';
+import {registerSelectUrlsTool} from '../tools/selectUrls';
 
 const sitemapUrl = 'https://example.com/sitemap.xml';
 const client = () => new SitemapClient(['example.com'], 1000);

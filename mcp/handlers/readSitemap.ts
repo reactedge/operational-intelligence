@@ -1,5 +1,5 @@
 import type {z} from 'zod';
-import {readSitemap, ReadSitemapInputSchema} from '../operations/readSitemap.js';
+import {readSitemap, ReadSitemapInputSchema} from '../operations/readSitemap';
 
 export async function handleReadSitemap(input: z.infer<typeof ReadSitemapInputSchema>) {
     try {

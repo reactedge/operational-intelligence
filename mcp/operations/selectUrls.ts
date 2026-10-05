@@ -1,6 +1,6 @@
 import {z} from 'zod';
-import {SitemapPlanner} from '../../sitemap-planner/src/model/sitemap/sitemap-planner.js';
-import {SitemapSelector} from '../../sitemap-planner/src/model/sitemap/sitemap-selector.js';
+import {SitemapPlanner} from '../../sitemap-planner/src/model/sitemap/sitemap-planner';
+import {SitemapSelector} from '../../sitemap-planner/src/model/sitemap/sitemap-selector';
 
 export const SelectUrlsInputSchema = z.object({
     entries: z.array(z.object({
